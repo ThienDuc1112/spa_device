@@ -1,0 +1,15 @@
+plugins { id 'com.android.library' }
+android {
+ namespace 'com.company.device.factory'
+ compileSdk 35
+ defaultConfig { minSdk 26 }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17; coreLibraryDesugaringEnabled true }
+}
+dependencies {
+ coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+ testImplementation 'junit:junit:4.13.2'
+ api project(':device-api')
+ implementation project(':device-android')
+ implementation project(':device-zebra')
+ implementation project(':device-urovo')
+}

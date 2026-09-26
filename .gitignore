@@ -1,0 +1,13 @@
+.env
+.tools/
+.cache/
+**/target/
+**/build/
+**/.gradle/
+**/local.properties
+**/google-services.json
+**/service-account*.json
+.idea/
+*.iml
+__pycache__/
+*.pyc

@@ -1,0 +1,10 @@
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+ repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+ repositories {
+  google()
+  mavenCentral()
+ }
+}
+rootProject.name = 'pda-android'
+include ':app', ':scanner-api', ':scanner-zebra', ':scanner-urovo', ':scanner-generic', ':scanner-factory', ':device-api', ':device-android', ':device-zebra', ':device-urovo', ':device-factory'

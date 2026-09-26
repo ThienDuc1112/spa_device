@@ -1,0 +1,227 @@
+pda-android/
+│
+├── app/
+│   ├── build.gradle
+│   │
+│   └── src/
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   │
+│       │   ├── java/com/company/pda/
+│       │   │   │
+│       │   │   ├── PdaApplication.java
+│       │   │   │
+│       │   │   ├── di/
+│       │   │   │   ├── AppModule.java
+│       │   │   │   ├── NetworkModule.java
+│       │   │   │   ├── DatabaseModule.java
+│       │   │   │   ├── ScannerModule.java
+│       │   │   │   └── DeviceModule.java
+│       │   │   │
+│       │   │   ├── presentation/
+│       │   │   │   ├── auth/
+│       │   │   │   │   ├── LoginActivity.java
+│       │   │   │   │   ├── LoginViewModel.java
+│       │   │   │   │   └── LoginUiState.java
+│       │   │   │   │
+│       │   │   │   ├── home/
+│       │   │   │   │   ├── HomeActivity.java
+│       │   │   │   │   └── HomeViewModel.java
+│       │   │   │   │
+│       │   │   │   ├── scanner/
+│       │   │   │   │   ├── ScannerViewModel.java
+│       │   │   │   │   └── ScannerUiState.java
+│       │   │   │   │
+│       │   │   │   ├── product/
+│       │   │   │   │   ├── ProductFragment.java
+│       │   │   │   │   ├── ProductViewModel.java
+│       │   │   │   │   ├── ProductUiState.java
+│       │   │   │   │   └── ProductImageViewerFragment.java
+│       │   │   │   │
+│       │   │   │   ├── inventory/
+│       │   │   │   │   ├── InventoryFragment.java
+│       │   │   │   │   ├── InventoryViewModel.java
+│       │   │   │   │   └── InventoryUiState.java
+│       │   │   │   │
+│       │   │   │   ├── disposal/
+│       │   │   │   │   ├── DisposalFragment.java
+│       │   │   │   │   ├── DisposalViewModel.java
+│       │   │   │   │   └── DisposalUiState.java
+│       │   │   │   │
+│       │   │   │   └── pdafinder/
+│       │   │   │       ├── PdaFinderActivity.java
+│       │   │   │       ├── PdaFinderViewModel.java
+│       │   │   │       └── PdaFinderUiState.java
+│       │   │   │
+│       │   │   ├── domain/
+│       │   │   │   ├── model/
+│       │   │   │   │   ├── Product.java
+│       │   │   │   │   ├── Inventory.java
+│       │   │   │   │   ├── Disposal.java
+│       │   │   │   │   ├── ScanResult.java
+│       │   │   │   │   └── PdaFindRequest.java
+│       │   │   │   │
+│       │   │   │   ├── repository/
+│       │   │   │   │   ├── AuthRepository.java
+│       │   │   │   │   ├── ProductRepository.java
+│       │   │   │   │   ├── InventoryRepository.java
+│       │   │   │   │   ├── DisposalRepository.java
+│       │   │   │   │   └── PdaFinderRepository.java
+│       │   │   │   │
+│       │   │   │   ├── scanner/
+│       │   │   │   │   └── ScannerRepository.java
+│       │   │   │   │
+│       │   │   │   └── usecase/
+│       │   │   │       ├── LoginUseCase.java
+│       │   │   │       ├── ScanBarcodeUseCase.java
+│       │   │   │       ├── GetProductUseCase.java
+│       │   │   │       ├── AdjustInventoryUseCase.java
+│       │   │   │       ├── ConfirmDisposalUseCase.java
+│       │   │   │       ├── StartPdaAlarmUseCase.java
+│       │   │   │       └── StopPdaAlarmUseCase.java
+│       │   │   │
+│       │   │   ├── data/
+│       │   │   │   ├── remote/
+│       │   │   │   │   ├── api/
+│       │   │   │   │   │   ├── AuthApi.java
+│       │   │   │   │   │   ├── ProductApi.java
+│       │   │   │   │   │   ├── InventoryApi.java
+│       │   │   │   │   │   ├── DisposalApi.java
+│       │   │   │   │   │   └── PdaFinderApi.java
+│       │   │   │   │   │
+│       │   │   │   │   ├── dto/
+│       │   │   │   │   │   ├── auth/
+│       │   │   │   │   │   ├── product/
+│       │   │   │   │   │   ├── inventory/
+│       │   │   │   │   │   ├── disposal/
+│       │   │   │   │   │   └── pdafinder/
+│       │   │   │   │   │
+│       │   │   │   │   └── interceptor/
+│       │   │   │   │       ├── AuthInterceptor.java
+│       │   │   │   │       └── TokenAuthenticator.java
+│       │   │   │   │
+│       │   │   │   ├── local/
+│       │   │   │   │   ├── AppDatabase.java
+│       │   │   │   │   ├── dao/
+│       │   │   │   │   ├── entity/
+│       │   │   │   │   └── preferences/
+│       │   │   │   │       └── TokenStorage.java
+│       │   │   │   │
+│       │   │   │   ├── repository/
+│       │   │   │   │   ├── AuthRepositoryImpl.java
+│       │   │   │   │   ├── ProductRepositoryImpl.java
+│       │   │   │   │   ├── InventoryRepositoryImpl.java
+│       │   │   │   │   ├── DisposalRepositoryImpl.java
+│       │   │   │   │   ├── PdaFinderRepositoryImpl.java
+│       │   │   │   │   └── ScannerRepositoryImpl.java
+│       │   │   │   │
+│       │   │   │   └── mapper/
+│       │   │   │       ├── ProductMapper.java
+│       │   │   │       └── InventoryMapper.java
+│       │   │   │
+│       │   │   ├── infrastructure/
+│       │   │   │   ├── firebase/
+│       │   │   │   │   ├── PdaFirebaseMessagingService.java
+│       │   │   │   │   └── FcmTokenManager.java
+│       │   │   │   │
+│       │   │   │   ├── alarm/
+│       │   │   │   │   ├── PdaAlarmService.java
+│       │   │   │   │   ├── AlarmController.java
+│       │   │   │   │   └── AlarmTimeoutManager.java
+│       │   │   │   │
+│       │   │   │   └── device/
+│       │   │   │       └── DeviceManager.java
+│       │   │   │
+│       │   │   └── common/
+│       │   │       ├── exception/
+│       │   │       ├── result/
+│       │   │       ├── util/
+│       │   │       └── logging/
+│       │   │
+│       │   └── res/
+│       │       ├── layout/
+│       │       ├── drawable/
+│       │       ├── raw/
+│       │       │   └── pda_alarm.mp3
+│       │       └── values/
+│       │
+│       ├── test/
+│       └── androidTest/
+│
+│
+├── scanner-api/
+│   └── src/main/java/com/company/scanner/api/
+│       ├── ScannerManager.java
+│       ├── ScanResult.java
+│       ├── ScanCallback.java
+│       ├── ScannerConfig.java
+│       ├── ScannerType.java
+│       ├── ScannerProvider.java
+│       └── ScannerCapability.java
+│
+├── scanner-zebra/
+│   └── src/main/java/com/company/scanner/zebra/
+│       ├── ZebraScannerManager.java
+│       ├── ZebraScannerConfig.java
+│       └── ZebraScannerProvider.java
+│
+├── scanner-urovo/
+│   └── src/main/java/com/company/scanner/urovo/
+│       ├── UrovoScannerManager.java
+│       ├── UrovoScannerConfig.java
+│       └── UrovoScannerProvider.java
+│
+├── scanner-generic/
+│   └── src/main/java/com/company/scanner/generic/
+│       ├── IntentScannerManager.java
+│       ├── CameraScannerManager.java
+│       └── GenericScannerProvider.java
+│
+├── scanner-factory/
+│   └── src/main/java/com/company/scanner/factory/
+│       └── ScannerFactory.java
+│
+│
+├── device-api/
+│   └── src/main/java/com/company/device/api/
+│       ├── DeviceInfo.java
+│       ├── DeviceInfoProvider.java
+│       ├── DeviceCapability.java
+│       ├── AlarmPlayer.java
+│       ├── VolumeController.java
+│       ├── AudioModeController.java
+│       ├── AlarmPolicy.java
+│       ├── AlarmResult.java
+│       ├── AlarmStatus.java
+│       └── DeviceAlarmAdapter.java
+│
+├── device-android/
+│   └── src/main/java/com/company/device/android/
+│       ├── AndroidDeviceInfoProvider.java
+│       ├── AndroidAlarmPlayer.java
+│       ├── AndroidVolumeController.java
+│       ├── AndroidAudioModeController.java
+│       └── AndroidAlarmAdapter.java
+│
+├── device-zebra/
+│   └── src/main/java/com/company/device/zebra/
+│       ├── ZebraDeviceAdapter.java
+│       └── ZebraAlarmAdapter.java
+│
+├── device-urovo/
+│   └── src/main/java/com/company/device/urovo/
+│       ├── UrovoDeviceAdapter.java
+│       └── UrovoAlarmAdapter.java
+│
+├── device-factory/
+│   └── src/main/java/com/company/device/factory/
+│       ├── DeviceAlarmFactory.java
+│       └── DeviceAlarmProvider.java
+│
+├── build.gradle
+├── settings.gradle
+├── gradle.properties
+├── gradlew
+├── gradlew.bat
+├── .gitignore
+└── README.md

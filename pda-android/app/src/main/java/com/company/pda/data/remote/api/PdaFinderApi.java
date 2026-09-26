@@ -1,0 +1,31 @@
+package com.company.pda.data.remote.api;
+
+import com.company.pda.data.remote.dto.pdafinder.PdaFinderDto.*;
+import java.util.List;
+import retrofit2.Call;
+import retrofit2.http.*;
+
+public interface PdaFinderApi {
+  @GET("devices")
+  Call<List<Device>> devices();
+
+  @POST("devices/register")
+  Call<Registration> register(@Body Register body);
+
+  @PUT("devices/token")
+  Call<Void> token(
+      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret, @Body Token body);
+
+  @POST("pda/find")
+  Call<Request> find(@Body Find body);
+
+  @GET("pda/find/{id}")
+  Call<Request> status(@Path("id") String id);
+
+  @POST("pda/stop")
+  Call<Void> stop(@Body Stop body);
+
+  @POST("pda/events")
+  Call<Void> event(
+      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret, @Body Event body);
+}

@@ -1,0 +1,16 @@
+plugins { id 'com.android.library' }
+android {
+ namespace 'com.company.scanner.generic'
+ compileSdk 35
+ defaultConfig { minSdk 26 }
+ testOptions { unitTests.returnDefaultValues = true }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17; coreLibraryDesugaringEnabled true }
+}
+dependencies {
+ coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+ testImplementation 'junit:junit:4.13.2'
+ testImplementation 'org.mockito:mockito-core:5.14.2'
+ api project(':scanner-api')
+ implementation 'androidx.core:core:1.15.0'
+ implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
+}

@@ -1,0 +1,3 @@
+-keepattributes Signature,InnerClasses,EnclosingMethod
+-keep class com.company.pda.domain.model.** { *; }
+-keep class com.company.pda.data.remote.dto.** { *; }
