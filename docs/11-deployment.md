@@ -5,7 +5,7 @@
 Prerequisites: JDK 21 and Maven 3.9+, Android SDK 35 and an installed/licensed SDK toolchain. The Gradle 8.11.1 wrapper is included. Backend integration tests start an isolated real PostgreSQL 14 instance using [Zonky Embedded Postgres](https://github.com/zonkyio/embedded-postgres), including on Windows; no Docker daemon is required for the test suite. Run tests as a non-root user on Linux. The application deployment uses PostgreSQL 16.
 
 ```sh
-mvn -f backend/pom.xml verify
+mvn -f pda-management/pom.xml verify
 cd pda-android
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
@@ -16,9 +16,11 @@ Windows: use `gradlew.bat`; set JAVA_HOME to JDK 21 and ANDROID_HOME to your SDK
 ./gradlew assembleDebug -PapiUrl=https://pda.your-company.example/
 ```
 
-Outputs: `backend/target/retail-pda-1.0.0.jar` and `pda-android/app/build/outputs/apk/debug/app-debug.apk`. Firebase configuration is optional for compilation, so CI does not need secrets. It is required for push functionality. Release APKs need your enterprise signing configuration; no private signing key is committed.
+Outputs: `pda-management/target/pda-management-1.0.0.jar` and `pda-android/app/build/outputs/apk/debug/app-debug.apk`. Firebase configuration is optional for compilation, so CI does not need secrets. It is required for push functionality. Release APKs need your enterprise signing configuration; no private signing key is committed.
 
 ## First backend installation
+
+Fresh databases use the six migrations in `db/migration`. For an existing database that already applied `V1__retail_schema.sql`, set `SPRING_FLYWAY_LOCATIONS=classpath:db/legacy` in `.env` before starting this version. The legacy directory contains the unchanged original migration. Do not combine the two locations or remove Flyway history to bypass validation.
 
 1. Copy `.env.example` to `.env`. Set a random database password and JWT secret. Generate the latter from 32 or more random bytes and Base64 encode it (e.g. `openssl rand -base64 32`); keep it in your secret manager. Do not reuse the test-only all-zero key.
 2. For initial provisioning only, set `APP_BOOTSTRAP_ENABLED=true` and a random `BOOTSTRAP_PASSWORD` of at least 16 characters. Bootstrap creates STORE-001 and the `admin` manager only when the user table is empty. It never overwrites existing users.

@@ -289,8 +289,8 @@ Các đường dẫn trên là đường dẫn endpoint trong code; app ghép ch
 
 1. [PdaFinderActivity](../pda-android/app/src/main/java/com/company/pda/presentation/pdafinder/PdaFinderActivity.java) và [PdaFinderViewModel](../pda-android/app/src/main/java/com/company/pda/presentation/pdafinder/PdaFinderViewModel.java): các nút và trạng thái màn hình.
 2. [PdaFinderRepositoryImpl](../pda-android/app/src/main/java/com/company/pda/data/repository/PdaFinderRepositoryImpl.java) và [PdaFinderApi](../pda-android/app/src/main/java/com/company/pda/data/remote/api/PdaFinderApi.java): gọi server và điều khiển chuông cục bộ.
-3. [FinderService](../backend/src/main/java/com/company/application/FinderService.java): tạo/dừng yêu cầu và xử lý acknowledgement.
-4. [OutboxProcessor](../backend/src/main/java/com/company/application/OutboxProcessor.java) và [FirebasePushGateway](../backend/src/main/java/com/company/infrastructure/push/FirebasePushGateway.java): gửi FCM, retry và hết hạn.
+3. [PdaFinderService](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java): tạo/dừng yêu cầu và xử lý acknowledgement.
+4. [OutboxProcessor](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/OutboxProcessor.java) và [FirebaseNotificationAdapter](../pda-management/src/main/java/com/company/pda/infrastructure/firebase/FirebaseNotificationAdapter.java): gửi FCM, retry và hết hạn.
 5. [PdaFirebaseMessagingService](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/PdaFirebaseMessagingService.java): điểm nhận FIND/STOP trên PDA đích.
 6. [AlarmController](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/AlarmController.java) và [PdaAlarmService](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/PdaAlarmService.java): phiên chuông, notification và cleanup.
 7. [DeviceAlarmFactory](../pda-android/device-factory/src/main/java/com/company/device/factory/DeviceAlarmFactory.java) và [AndroidAlarmAdapter](../pda-android/device-android/src/main/java/com/company/device/android/AndroidAlarmAdapter.java): chọn hãng và phát âm thanh.

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.PdaFindMapper">
+  <select id="find" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity">
+    SELECT id,requester_id,store_id,device_id,status,expires_at FROM pda_find_requests WHERE id=#{id} AND store_id=#{storeId}
+  </select>
+  <insert id="create">
+    INSERT INTO pda_find_requests(id,requester_id,store_id,device_id,status,expires_at) VALUES(#{id},#{actorId},#{storeId},#{deviceId},'QUEUED',#{expiresAt})
+  </insert>
+  <update id="status">
+    UPDATE pda_find_requests SET status=#{status},updated_at=now() WHERE id=#{id} AND status IN ('QUEUED','SENT','RINGING')
+  </update>
+  <update id="sent">
+    UPDATE pda_find_requests SET status='SENT',updated_at=now() WHERE id=#{id} AND status='QUEUED'
+  </update>
+  <insert id="log">
+    INSERT INTO pda_alert_logs(request_id,device_id,event,message) VALUES(#{id},#{deviceId},#{event},#{message})
+  </insert>
+  <select id="expired" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity">
+    SELECT id,requester_id,store_id,device_id,status,expires_at FROM pda_find_requests WHERE expires_at&lt;=now() AND status IN ('QUEUED','SENT','RINGING') FOR UPDATE SKIP LOCKED
+  </select>
+</mapper>

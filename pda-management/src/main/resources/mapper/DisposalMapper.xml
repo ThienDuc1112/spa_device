@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.DisposalMapper">
+  <select id="find" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.DisposalEntity">
+    SELECT id,store_id,status,remarks,created_by,version,created_at FROM disposals WHERE id=#{id} AND store_id=#{storeId}
+  </select>
+  <select id="lock" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.DisposalEntity">
+    SELECT id,store_id,status,remarks,created_by,version,created_at FROM disposals WHERE id=#{id} AND store_id=#{storeId} FOR UPDATE
+  </select>
+  <select id="list" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.DisposalEntity">
+    SELECT id,store_id,status,remarks,created_by,version,created_at FROM disposals WHERE store_id=#{storeId} ORDER BY created_at DESC,id LIMIT 50 OFFSET #{offset}
+  </select>
+  <select id="items" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.DisposalItemEntity">
+    SELECT product_id,quantity,reason FROM disposal_items WHERE disposal_id=#{id} ORDER BY product_id
+  </select>
+  <select id="history" resultType="map">
+    SELECT old_status,new_status,changed_by,changed_at FROM disposal_histories WHERE disposal_id=#{id} ORDER BY id
+  </select>
+  <insert id="create">
+    INSERT INTO disposals(id,store_id,remarks,created_by) VALUES(#{id},#{storeId},#{remarks},#{actorId})
+  </insert>
+  <insert id="item">
+    INSERT INTO disposal_items(disposal_id,product_id,quantity,reason) VALUES(#{id},#{productId},#{quantity},#{reason})
+  </insert>
+  <update id="transition">
+    UPDATE disposals SET status=#{status},version=version+1,updated_at=now() WHERE id=#{id} AND version=#{version} AND status='PENDING'
+  </update>
+  <insert id="historyAdd">
+    INSERT INTO disposal_histories(disposal_id,old_status,new_status,changed_by) VALUES(#{id},#{oldStatus},#{newStatus},#{actorId})
+  </insert>
+</mapper>

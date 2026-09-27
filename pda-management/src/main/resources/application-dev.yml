@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/retail}
+    username: ${DATABASE_USER:retail}
+app:
+  scheduler-enabled: ${APP_SCHEDULER_ENABLED:false}
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    password: ${SEED_PASSWORD:}

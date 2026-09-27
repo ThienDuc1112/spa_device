@@ -14,13 +14,17 @@ services:
       retries: 20
     restart: unless-stopped
   backend:
-    build: ./backend
+    build: ./pda-management
     environment:
       DATABASE_URL: jdbc:postgresql://db:5432/retail
       DATABASE_USER: retail
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      APP_SEED_ENABLED: ${APP_SEED_ENABLED:-false}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
       FCM_ENABLED: ${FCM_ENABLED:-false}
+      SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
       FINDER_TIMEOUT_SECONDS: ${FINDER_TIMEOUT_SECONDS:-60}
       APP_BOOTSTRAP_ENABLED: ${APP_BOOTSTRAP_ENABLED:-false}
       BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.ProductMapper">
+  <select id="barcode" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.ProductEntity">
+    SELECT id,barcode,product_code,product_name,image_url,image_version FROM products WHERE barcode=#{barcode} AND active=true
+  </select>
+  <select id="code" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.ProductEntity">
+    SELECT id,barcode,product_code,product_name,image_url,image_version FROM products WHERE product_code=#{code} AND active=true
+  </select>
+  <update id="image">
+    UPDATE products SET image_url=#{url},image_version=#{version},updated_at=now() WHERE id=#{id} AND image_version&lt;#{version}
+  </update>
+  <insert id="imageLog">
+    INSERT INTO product_image_sync_logs(product_id,image_url,source_version,sync_status,created_by) VALUES(#{id},#{url},#{version},#{status},#{actorId})
+  </insert>
+</mapper>

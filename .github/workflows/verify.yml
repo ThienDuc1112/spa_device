@@ -10,8 +10,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: backend/pom.xml
-      - run: mvn -B -f backend/pom.xml verify
+          cache-dependency-path: pda-management/pom.xml
+      - run: mvn -B -f pda-management/pom.xml verify
   android:
     runs-on: ubuntu-latest
     steps:

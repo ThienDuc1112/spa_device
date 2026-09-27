@@ -11,6 +11,8 @@ uuid=string(format='uuid'); timestamp=string(format='date-time'); qty={'type':'n
 obj('Login',{'username':string(minLength=1,maxLength=100),'password':string(minLength=1,maxLength=200,writeOnly=True)})
 obj('RefreshBody',{'refreshToken':string(minLength=1,maxLength=4096,writeOnly=True)})
 obj('Tokens',{'accessToken':string(),'refreshToken':string(),'expiresIn':integer()})
+obj('RegisterUser',{'username':string(pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{2,99}$'),'password':string(minLength=12,maxLength=72,writeOnly=True,description='At most 72 UTF-8 bytes'),'fullName':string(minLength=1,maxLength=255),'email':string(format='email',maxLength=255,nullable=True)},['username','password','fullName'])
+obj('RegisteredUser',{'id':integer(),'username':string(),'storeId':integer(),'role':string(enum=['EMPLOYEE'])})
 obj('Register',{'deviceCode':string(minLength=1,maxLength=100),'deviceName':string(minLength=1,maxLength=255),'fcmToken':string(minLength=1,maxLength=4096)})
 obj('Registration',{'deviceId':integer(),'deviceSecret':string()})
 obj('Token',{'fcmToken':string(minLength=1,maxLength=4096)})
@@ -47,6 +49,9 @@ def route(method,path,name,request=None,response=None,role='Authenticated',array
  paths.setdefault(path,{})[method]=spec
 route('post','/auth/login','login','Login','Tokens','Public')
 route('post','/auth/refresh','refresh','RefreshBody','Tokens','Public')
+route('post','/auth/register','registerEmployee','RegisterUser','RegisteredUser','MANAGER')
+paths['/auth/register']['post']['responses']['201'] = paths['/auth/register']['post']['responses'].pop('200')
+paths['/auth/register']['post']['responses']['201']['description'] = 'Employee created in the authenticated manager store'
 route('get','/devices','listDevices',response='Device',role='MANAGER',array=True)
 route('post','/devices/register','registerDevice','Register','Registration','MANAGER')
 route('put','/devices/token','refreshDeviceToken','Token',role='Device')

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.OperationsMapper">
+  <insert id="systemAudit">
+    INSERT INTO audit_logs(store_id,operation,reference) VALUES(#{storeId},#{operation},#{reference})
+  </insert>
+  <insert id="audit">
+    INSERT INTO audit_logs(actor_id,store_id,operation,reference) VALUES(#{actorId},#{storeId},#{operation},#{reference})
+  </insert>
+  <insert id="enqueue">
+    INSERT INTO outbox_events(event_type,aggregate_id,payload) VALUES(#{type},#{aggregateId},CAST(#{payload} AS jsonb))
+  </insert>
+  <select id="next" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.OutboxEntity">
+    SELECT id,event_type,aggregate_id,payload::text,attempts FROM outbox_events WHERE processed_at IS NULL AND available_at&lt;=now() ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED
+  </select>
+  <update id="done">
+    UPDATE outbox_events SET processed_at=now() WHERE id=#{id}
+  </update>
+  <update id="retry">
+    UPDATE outbox_events SET attempts=attempts+1,available_at=now()+LEAST(300,power(2,LEAST(attempts+1,8))) * interval '1 second' WHERE id=#{id}
+  </update>
+</mapper>

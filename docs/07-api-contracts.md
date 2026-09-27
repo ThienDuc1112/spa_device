@@ -4,6 +4,7 @@ All paths are relative to the HTTPS API origin. Authenticated employee calls sen
 
 | Method | Path | Permission | Body / response |
 |---|---|---|---|
+| POST | `/auth/register` | MANAGER | RegisterUser -> RegisteredUser, HTTP 201 |
 | POST | `/auth/login` | Public, rate-limited at ingress | Login → Tokens |
 | POST | `/auth/refresh` | Refresh JWT | RefreshBody → Tokens |
 | GET | `/devices` | MANAGER | Device summary array, maximum 500 |
@@ -25,6 +26,14 @@ All paths are relative to the HTTPS API origin. Authenticated employee calls sen
 | POST | `/disposals/{id}/cancel` | MANAGER | Transition → Disposal |
 
 ## Authentication
+
+Managers can create employees with `POST /auth/register` and a bearer access token:
+
+```json
+{"username":"employee01","password":"Employee-demo-2026!","fullName":"New Employee","email":"employee01@example.test"}
+```
+
+Returns HTTP 201 with `{id, username, storeId, role}`. The role is always `EMPLOYEE`; store ID comes from the manager, not the request. Username is unique, 3–100 ASCII letters/digits/dot/underscore/hyphen, starting with a letter or digit. Password is at least 12 characters and at most 72 UTF-8 bytes. Full name is required; email is optional. Anonymous requests return 401, non-managers 403, invalid data 400 and duplicate usernames 409. No credentials are returned. The new employee signs in using the login endpoint.
 
 ```json
 {"username":"admin","password":"your-provisioned-password"}
@@ -99,5 +108,5 @@ Response example:
 
 ## Source of truth
 
-Validated DTO definitions: `backend/src/main/java/com/company/application/dto/Contracts.java`.
+Validated DTO definitions: `pda-management/src/main/java/com/company/pda/presentation/rest/*/dto/`.
 The OpenAPI document is `docs/openapi.json`. Never log passwords, authorization headers, refresh tokens, device secrets or FCM tokens.

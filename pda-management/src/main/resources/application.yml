@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/retail}
+    username: ${DATABASE_USER:retail}
+    password: ${DATABASE_PASSWORD}
+  jackson:
+    default-property-inclusion: always
+  mvc:
+    problemdetails:
+      enabled: true
+server:
+  shutdown: graceful
+  error:
+    include-message: never
+mybatis:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-handlers-package: com.company.pda.infrastructure.persistence.mybatis
+  configuration:
+    map-underscore-to-camel-case: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+app:
+  jwt-secret: ${JWT_SECRET}
+  issuer: retail-pda
+  fcm-enabled: ${FCM_ENABLED:false}
+  finder-timeout-seconds: ${FINDER_TIMEOUT_SECONDS:60}
+  bootstrap:
+    enabled: ${APP_BOOTSTRAP_ENABLED:false}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.InventoryMapper">
+  <select id="lockStore" resultType="String">
+    SELECT pg_advisory_xact_lock(#{storeId})
+  </select>
+  <select id="find" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.InventoryEntity">
+    SELECT id,product_id,store_id,quantity,version FROM inventories WHERE store_id=#{storeId} AND product_id=#{productId}
+  </select>
+  <update id="update">
+    UPDATE inventories SET quantity=#{quantity},version=version+1,updated_at=now() WHERE store_id=#{storeId} AND product_id=#{productId} AND version=#{version}
+  </update>
+  <insert id="adjustment">
+    INSERT INTO inventory_adjustments(id,store_id,product_id,old_qty,new_qty,expected_version,reason,created_by) VALUES(#{id},#{storeId},#{productId},#{oldQty},#{newQty},#{version},#{reason},#{actorId})
+  </insert>
+  <select id="adjustmentById" resultType="map">
+    SELECT * FROM inventory_adjustments WHERE id=#{id} AND store_id=#{storeId}
+  </select>
+  <select id="transaction" resultType="Long" affectData="true" flushCache="true">
+    INSERT INTO inventory_transactions(store_id,product_id,transaction_type,qty_before,qty_change,qty_after,adjustment_id,disposal_id,created_by) VALUES(#{storeId},#{productId},#{type},#{before},#{change},#{after},#{adjustmentId},#{disposalId},#{actorId}) RETURNING id
+  </select>
+  <select id="transactions" resultType="map">
+    SELECT * FROM inventory_transactions WHERE store_id=#{storeId} AND id&gt;#{afterId} ORDER BY id LIMIT 200
+  </select>
+</mapper>
