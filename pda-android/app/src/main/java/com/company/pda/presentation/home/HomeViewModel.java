@@ -62,6 +62,7 @@ public class HomeViewModel extends AsyncViewModel {
           modules.finder.register(code, name);
           return () -> {
             modules.fcm.initialize();
+            com.company.pda.infrastructure.firebase.FinderPollingService.start(getApplication());
             status.setValue("Device registered");
           };
         });

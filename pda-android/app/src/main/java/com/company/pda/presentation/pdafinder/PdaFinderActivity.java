@@ -35,7 +35,7 @@ public class PdaFinderActivity extends AlarmAwareActivity {
               () -> startActivity(new android.content.Intent(this, FinderSoundActivity.class)));
           for (var d : state.devices())
             ui.button(
-                d.deviceName + " · " + (d.reachable ? "Find" : "No push token"),
+                d.deviceName + " · " + (d.reachable ? "Find" : "Find via polling"),
                 () -> vm.find(d.id));
           if (state.request() != null) {
             ui.text("Request " + state.request().id + "\n" + state.request().status, 16);

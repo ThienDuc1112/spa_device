@@ -837,6 +837,181 @@
         "parameters": []
       }
     },
+    "/pda/fcm-health": {
+      "get": {
+        "operationId": "finderFcmHealth",
+        "summary": "finderFcmHealth",
+        "description": "Required permission: Device",
+        "security": [
+          {
+            "DeviceId": [],
+            "DeviceSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FcmHealth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in current store",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, state, or duplicate conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ingress rate limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/pda/commands": {
+      "get": {
+        "operationId": "pollFinderCommands",
+        "summary": "pollFinderCommands",
+        "description": "Required permission: Device",
+        "security": [
+          {
+            "DeviceId": [],
+            "DeviceSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceFinderCommand"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in current store",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, state, or duplicate conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ingress rate limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
     "/pda/events": {
       "post": {
         "operationId": "acknowledgeFinder",
@@ -2043,14 +2218,13 @@
           },
           "fcmToken": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "maxLength": 4096,
+            "nullable": true
           }
         },
         "required": [
           "deviceCode",
-          "deviceName",
-          "fcmToken"
+          "deviceName"
         ]
       },
       "Registration": {
@@ -2108,6 +2282,52 @@
           "deviceName",
           "reachable",
           "lastActiveAt"
+        ]
+      },
+      "FcmHealth": {
+        "type": "object",
+        "properties": {
+          "fallbackRequired": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "FCM_DISABLED",
+              "NO_TOKEN",
+              "PUSH_FAILED",
+              "READY"
+            ]
+          }
+        },
+        "required": [
+          "fallbackRequired",
+          "reason"
+        ]
+      },
+      "DeviceFinderCommand": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command": {
+            "type": "string",
+            "enum": [
+              "FIND",
+              "STOP"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "requestId",
+          "command",
+          "expiresAt"
         ]
       },
       "Find": {

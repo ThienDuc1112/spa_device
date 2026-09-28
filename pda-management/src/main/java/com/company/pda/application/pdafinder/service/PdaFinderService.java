@@ -3,6 +3,7 @@ package com.company.pda.application.pdafinder.service;
 import static com.company.pda.domain.shared.exception.DomainException.*;
 
 import com.company.pda.application.device.usecase.DeviceUseCase;
+import com.company.pda.application.pdafinder.dto.FcmHealthResult;
 import com.company.pda.application.pdafinder.dto.FindPdaCommand;
 import com.company.pda.application.pdafinder.dto.FindPdaResult;
 import com.company.pda.application.pdafinder.dto.PdaAlertEventCommand;
@@ -28,6 +29,7 @@ public class PdaFinderService implements FinderUseCase {
   private final OperationsRepository ops;
   private final CurrentActor actor;
   private final int timeout;
+  private final boolean fcmEnabled;
 
   public PdaFinderService(
       PdaFindRepository repo,
@@ -35,13 +37,15 @@ public class PdaFinderService implements FinderUseCase {
       DeviceUseCase identity,
       OperationsRepository ops,
       CurrentActor actor,
-      @Value("${app.finder-timeout-seconds}") int timeout) {
+      @Value("${app.finder-timeout-seconds}") int timeout,
+      @Value("${app.fcm-enabled:false}") boolean fcmEnabled) {
     this.repo = repo;
     this.devices = devices;
     this.identity = identity;
     this.ops = ops;
     this.actor = actor;
     this.timeout = Math.max(10, Math.min(300, timeout));
+    this.fcmEnabled = fcmEnabled;
   }
 
   @Transactional
@@ -50,7 +54,6 @@ public class PdaFinderService implements FinderUseCase {
     long deviceId = command.deviceId();
     var d = devices.find(deviceId, a.storeId());
     if (d == null) throw new DeviceNotInStoreException();
-    require(d.fcmToken() != null, "Device has no valid push token; register it again");
     UUID id = UUID.randomUUID();
     repo.create(id, a.id(), a.storeId(), deviceId, Instant.now().plusSeconds(timeout));
     repo.log(id, deviceId, PdaFindStatus.QUEUED.name(), null);
@@ -61,6 +64,31 @@ public class PdaFinderService implements FinderUseCase {
 
   public FindPdaResult status(UUID id) {
     return FindPdaResult.from(found(repo.find(id, actor.get().storeId())));
+  }
+
+  public FcmHealthResult fcmHealth(long deviceId, String secret) {
+    var device = identity.authenticate(deviceId, secret);
+    if (!fcmEnabled) return new FcmHealthResult(true, "FCM_DISABLED");
+    if (device.fcmToken() == null) return new FcmHealthResult(true, "NO_TOKEN");
+    String last = repo.lastPushEvent(deviceId, device.storeId());
+    boolean failed =
+        "RETRY".equals(last) || "INVALID_TOKEN".equals(last) || "NO_TOKEN".equals(last);
+    return new FcmHealthResult(failed, failed ? "PUSH_FAILED" : "READY");
+  }
+
+  public java.util.List<com.company.pda.application.pdafinder.dto.DeviceFinderCommand> commands(
+      long deviceId, String secret) {
+    var device = identity.authenticate(deviceId, secret);
+    return repo.commands(deviceId, device.storeId()).stream()
+        .map(
+            r ->
+                new com.company.pda.application.pdafinder.dto.DeviceFinderCommand(
+                    r.id(),
+                    java.util.Set.of("QUEUED", "SENT", "RINGING").contains(r.status())
+                        ? "FIND"
+                        : "STOP",
+                    r.expiresAt()))
+        .toList();
   }
 
   @Transactional

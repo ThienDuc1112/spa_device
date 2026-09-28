@@ -56,7 +56,9 @@ public class SecurityConfig {
                         "/auth/refresh",
                         "/actuator/health",
                         "/devices/token",
-                        "/pda/events")
+                        "/pda/events",
+                        "/pda/commands",
+                        "/pda/fcm-health")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

@@ -69,7 +69,7 @@ Trên PDA cần được tìm, mở Home và chọn **Register this PDA**. Luồ
 
 1. `FcmTokenManager.initialize()` lấy token từ Firebase nếu Firebase đã được cấu hình. Khi token thay đổi, `refreshed()` lưu token và lên lịch đồng bộ.
 2. Người quản lý nhập mã tài sản và tên thiết bị.
-3. `PdaFinderRepositoryImpl.register()` đọc token đã lưu, gọi `POST /devices/register`. Nếu chưa có token, app báo lỗi cấu hình/kết nối Firebase.
+3. `PdaFinderRepositoryImpl.register()` đọc token đã lưu, gọi `POST /devices/register`. Nếu chưa có token, vẫn đăng ký được để nhận lệnh qua polling.
 4. Backend tạo thiết bị gắn với cửa hàng, lưu FCM token và bản hash của device secret.
 5. Backend trả `deviceId` và `deviceSecret`; `DeviceManager.registered()` lưu chúng bằng `TokenStorage`.
 6. `SyncWorker` dùng hai giá trị này để xác thực khi cập nhật token và báo sự kiện.
@@ -108,7 +108,7 @@ Ví dụ request body:
 {"deviceId": 12}
 ```
 
-Backend kiểm tra thiết bị thuộc cùng cửa hàng và có FCM token, tạo UUID cho yêu cầu, ghi trạng thái `QUEUED`, log và lệnh `FIND` trong outbox cùng transaction. Backend trả yêu cầu vừa tạo về màn hình; tại thời điểm này PDA đích có thể chưa nhận được lệnh.
+Backend kiểm tra thiết bị thuộc cùng cửa hàng, tạo UUID cho yêu cầu, ghi trạng thái `QUEUED`, log và lệnh `FIND` trong outbox cùng transaction. Backend trả yêu cầu vừa tạo về màn hình; tại thời điểm này PDA đích có thể chưa nhận được lệnh.
 
 Thời hạn lấy từ `app.finder-timeout-seconds`, mặc định 60 giây, được giới hạn trong khoảng 10–300 giây. Thời gian được tính từ lúc tạo yêu cầu, không phải từ lúc PDA bắt đầu phát chuông.
 
@@ -130,20 +130,22 @@ Payload FCM có dạng:
 
 Gateway đặt Android priority là `HIGH`, TTL theo thời gian còn lại. Sau khi lời gọi gửi thành công, backend chuyển `QUEUED` sang `SENT` nếu yêu cầu vẫn ở trạng thái đó.
 
-Nếu token bị Firebase báo không còn đăng ký, backend vô hiệu hóa token tương ứng và đánh dấu yêu cầu thất bại. Lỗi gửi tạm thời được ghi log và retry trong giới hạn số lần/thời hạn của processor.
+Nếu token bị Firebase báo không còn đăng ký, backend vô hiệu hóa token tương ứng nhưng giữ yêu cầu cho polling tới khi hết hạn. Lỗi gửi tạm thời được ghi log và retry trong giới hạn số lần/thời hạn của processor.
 
 **`SENT` chỉ thể hiện bước gửi tới FCM thành công, chưa chứng minh PDA đã nhận hoặc đã phát chuông.**
 
 ## 6. PDA đích nhận lệnh và phát chuông
 
-`PdaFirebaseMessagingService.onMessageReceived()` đọc payload và kiểm tra:
+Polling chạy song song qua `GET /pda/commands` để nhận FIND/STOP khi FCM không tới máy. Service chạy nền với thông báo thường trực trên PDA đã cấu hình chính sách pin. Xem [cơ chế polling](15-finder-polling.md).
+
+`PdaFirebaseMessagingService.onMessageReceived()` chuyển payload tới `FinderCommandHandler` dùng chung với polling để kiểm tra:
 
 - `requestId` phải có và là UUID hợp lệ.
 - `STOP` được chuyển sang luồng dừng.
 - `FIND` phải chưa được đánh dấu `handled:<requestId>` và chưa hết hạn.
 - Message `FIND` phải có priority thực nhận là `HIGH`.
 
-Nếu priority không đạt hoặc khởi động chuông ném lỗi runtime, app thử hiện notification dự phòng và xếp sự kiện `FAILED` để gửi về backend.
+Nếu priority không đạt hoặc khởi động chuông ném lỗi runtime, app thử hiện notification dự phòng và giữ đường polling mở tới khi hết hạn. Lỗi phát âm thanh thực tế vẫn báo `FAILED`.
 
 Luồng bắt đầu chuông hợp lệ:
 
@@ -282,6 +284,7 @@ Màn hình này cho xem lý do lỗi âm thanh gần nhất, mở thiết lập 
 | `GET /pda/find/{id}` | Đọc trạng thái yêu cầu | Người dùng có quyền manager |
 | `POST /pda/stop` | Yêu cầu dừng từ xa | Người dùng có quyền manager |
 | `POST /pda/events` | PDA báo RINGING/STOPPED/FAILED | Device ID + device secret |
+| `GET /pda/commands` | PDA lấy FIND/STOP dự phòng qua HTTP | Device ID + device secret |
 
 Các đường dẫn trên là đường dẫn endpoint trong code; app ghép chúng với API base URL được cấu hình.
 
@@ -297,4 +300,4 @@ Các đường dẫn trên là đường dẫn endpoint trong code; app ghép ch
 8. [SyncWorker](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncWorker.java): hàng chờ trạng thái và đồng bộ về backend.
 9. [FinderSoundActivity](../pda-android/app/src/main/java/com/company/pda/presentation/pdafinder/FinderSoundActivity.java): thiết lập và thử loa cục bộ.
 
-Để chạy toàn bộ luồng cần cấu hình Firebase cho app và backend, bật gửi FCM/scheduler, đăng ký PDA và cho phép alarm audio trên máy đích. Xem [hướng dẫn triển khai](11-deployment.md), [kiểm tra âm thanh](12-finder-audio.md) và [kết quả kiểm chứng hiện có](verification.md). Tài liệu này giải thích code, không xác nhận đã kiểm thử live FCM hoặc loa trên PDA thật.
+Để chạy cần bật scheduler, đăng ký PDA và cho phép alarm audio trên máy đích. Đường push cần cấu hình Firebase cho app/backend; đường polling không cần Firebase nhưng cần cấu hình chạy nền/pin theo [hướng dẫn polling](15-finder-polling.md). Xem [hướng dẫn triển khai](11-deployment.md), [kiểm tra âm thanh](12-finder-audio.md) và [kết quả kiểm chứng hiện có](verification.md). Tài liệu này giải thích code, không xác nhận đã kiểm thử live FCM hoặc loa trên PDA thật.

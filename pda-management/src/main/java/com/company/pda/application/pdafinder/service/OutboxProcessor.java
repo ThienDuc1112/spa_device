@@ -53,7 +53,6 @@ public class OutboxProcessor {
     }
     var device = devices.find(request.deviceId(), request.storeId());
     if (device == null || device.fcmToken() == null) {
-      finder.status(request.id(), PdaFindStatus.FAILED.name());
       finder.log(request.id(), request.deviceId(), "NO_TOKEN", null);
       ops.done(event.id());
       return;
@@ -65,13 +64,12 @@ public class OutboxProcessor {
       ops.done(event.id());
     } catch (NotificationPort.InvalidToken e) {
       devices.invalidate(device.id(), device.fcmToken());
-      finder.status(request.id(), PdaFindStatus.FAILED.name());
       finder.log(request.id(), device.id(), "INVALID_TOKEN", null);
       ops.done(event.id());
     } catch (RuntimeException e) {
       finder.log(request.id(), device.id(), "RETRY", "Push unavailable");
       if (event.attempts() >= 7 || !request.expiresAt().isAfter(Instant.now())) {
-        finder.status(request.id(), PdaFindStatus.FAILED.name());
+        // Push exhaustion does not close the HTTP delivery path. Expiry is handled separately.
         ops.done(event.id());
       } else ops.retry(event.id());
     }

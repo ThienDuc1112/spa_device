@@ -6,6 +6,14 @@ import retrofit2.Call;
 import retrofit2.http.*;
 
 public interface PdaFinderApi {
+  @GET("pda/fcm-health")
+  Call<FcmHealth> fcmHealth(
+      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret);
+
+  @GET("pda/commands")
+  Call<List<Command>> commands(
+      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret);
+
   @GET("devices")
   Call<List<Device>> devices();
 

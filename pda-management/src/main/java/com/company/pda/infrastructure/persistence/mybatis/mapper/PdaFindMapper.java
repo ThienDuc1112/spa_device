@@ -6,6 +6,11 @@ import java.util.UUID;
 import org.apache.ibatis.annotations.Param;
 
 public interface PdaFindMapper {
+  String lastPushEvent(@Param("deviceId") long deviceId, @Param("storeId") long storeId);
+
+  java.util.List<PdaFindRequestEntity> commands(
+      @Param("deviceId") long deviceId, @Param("storeId") long storeId);
+
   PdaFindRequestEntity find(@Param("id") UUID id, @Param("storeId") long storeId);
 
   int create(

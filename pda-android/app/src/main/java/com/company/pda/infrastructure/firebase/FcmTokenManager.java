@@ -13,15 +13,37 @@ public class FcmTokenManager {
   }
 
   public void initialize() {
-    if (!com.google.firebase.FirebaseApp.getApps(context).isEmpty())
+    if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+      failed("NOT_CONFIGURED");
+    } else {
       com.google.firebase.messaging.FirebaseMessaging.getInstance()
           .getToken()
-          .addOnSuccessListener(this::refreshed);
+          .addOnSuccessListener(this::refreshed)
+          .addOnFailureListener(error -> failed("TOKEN_ERROR"));
+    }
     SyncWorker.schedule(context);
   }
 
   public void refreshed(String token) {
     tokens.put("fcmToken", token);
+    // Obtaining a token repairs token errors, but does not prove message delivery recovered.
+    if (!"DELIVERY_ERROR".equals(tokens.get("fcmFailure"))) tokens.put("fcmFailure", null);
     SyncWorker.schedule(context);
+  }
+
+  public boolean unavailable() {
+    return tokens.get("fcmToken") == null || tokens.get("fcmFailure") != null;
+  }
+
+  public void failed(String reason) {
+    tokens.put("fcmFailure", reason);
+  }
+
+  public void received() {
+    tokens.put("fcmFailure", null);
+  }
+
+  public void retryIfNeeded() {
+    if ("TOKEN_ERROR".equals(tokens.get("fcmFailure"))) initialize();
   }
 }

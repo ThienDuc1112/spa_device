@@ -4,6 +4,7 @@
  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -18,6 +19,9 @@
    <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>
   </service>
   <service android:name=".infrastructure.alarm.PdaAlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback"/>
+  <service android:name=".infrastructure.firebase.FinderPollingService" android:exported="false" android:foregroundServiceType="specialUse">
+   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Continuous device-finder command reception on enterprise-managed PDAs when push delivery is unavailable, including locked-screen operation"/>
+  </service>
   <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>
   <provider android:name="androidx.startup.InitializationProvider" android:authorities="${applicationId}.androidx-startup" android:exported="false" tools:node="merge">
    <meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove"/>

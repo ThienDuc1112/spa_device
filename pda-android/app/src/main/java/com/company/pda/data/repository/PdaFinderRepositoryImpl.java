@@ -62,9 +62,6 @@ public class PdaFinderRepositoryImpl implements PdaFinderRepository {
 
   public void register(String code, String name) throws java.io.IOException {
     String token = tokens.get("fcmToken");
-    if (token == null)
-      throw new java.io.IOException(
-          "Firebase token unavailable. Configure Firebase and reconnect.");
     var r = execute(api.register(new PdaFinderDto.Register(code, name, token)));
     device.registered(r.deviceId, r.deviceSecret);
   }

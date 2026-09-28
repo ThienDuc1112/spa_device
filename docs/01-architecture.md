@@ -13,6 +13,7 @@ flowchart LR
   PG --> Worker[Transactional outbox worker]
   Worker --> FCM[Firebase Admin / FCM]
   FCM --> Alarm[Foreground alarm service]
+  Android -->|Device-authenticated command polling| API
   Alarm -->|Device-authenticated events| API
   ERP[ERP image publisher] --> Images[HTTPS object storage / image CDN]
   ERP -->|Versioned image URL| API
@@ -32,6 +33,8 @@ Inventory updates compare versions and write an immutable ledger in the same tra
 
 Product images are published before the ERP submits a versioned immutable HTTPS URL. Stale versions are logged and ignored. The backend never downloads a caller-supplied URL. Android uses Glide placeholders for missing/failed images; cached product metadata is visibly marked offline. Inventory mutations require connectivity and are never silently queued.
 
-Android displays a dialog while its activity is visible and a notification while backgrounded. It does not bypass background activity launch restrictions or request overlay/full-screen-intent privileges. High-priority FCM can permit a foreground service start; downgraded messages and OS denial are reported as failures. Alarm volume changes may be restricted by device policy or DND. Validate the actual managed device fleet.
+Android displays a dialog while its activity is visible and a notification while backgrounded. It does not bypass background activity launch restrictions or request overlay/full-screen-intent privileges. High-priority FCM can permit a foreground service start; downgraded messages and OS denial show a fallback notification while HTTP polling remains available until expiry. Actual playback failures still report FAILED. Alarm volume changes may be restricted by device policy or DND. Validate the actual managed device fleet.
 
 References: [Android FGS restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start), [FCM token management](https://firebase.google.com/docs/cloud-messaging/manage-tokens), [Spring Boot 3.5 system requirements](https://docs.spring.io/spring-boot/3.5/system-requirements.html).
+
+Managed PDA finder also polls commands through a specialUse foreground service. See [polling and fleet power policy](15-finder-polling.md).

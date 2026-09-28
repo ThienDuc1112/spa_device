@@ -1,9 +1,11 @@
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/retail}
-    username: ${DATABASE_USER:retail}
+    url: jdbc:postgresql://localhost:5432/pda
+    username: postgres
+    password: "12345678"
+
 app:
-  scheduler-enabled: ${APP_SCHEDULER_ENABLED:false}
+  scheduler-enabled: false
   seed:
-    enabled: ${APP_SEED_ENABLED:false}
-    password: ${SEED_PASSWORD:}
+    enabled: true
+    password: "DemoPassword123!"

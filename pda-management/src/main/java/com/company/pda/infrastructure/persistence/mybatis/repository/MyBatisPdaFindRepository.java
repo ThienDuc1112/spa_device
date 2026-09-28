@@ -17,6 +17,18 @@ public class MyBatisPdaFindRepository implements PdaFindRepository {
   }
 
   @Override
+  public String lastPushEvent(long deviceId, long storeId) {
+    return mapper.lastPushEvent(deviceId, storeId);
+  }
+
+  @Override
+  public java.util.List<PdaFindRequest> commands(long deviceId, long storeId) {
+    return mapper.commands(deviceId, storeId).stream()
+        .map(PdaFindRequestEntityMapper::toDomain)
+        .toList();
+  }
+
+  @Override
   public PdaFindRequest find(UUID id, long storeId) {
     return PdaFindRequestEntityMapper.toDomain(mapper.find(id, storeId));
   }

@@ -23,6 +23,12 @@ public class HomeActivity extends AlarmAwareActivity {
   private HomeViewModel vm;
   private ActivityHomeBinding binding;
 
+  @Override
+  public void onResume() {
+    super.onResume();
+    com.company.pda.infrastructure.firebase.FinderPollingService.start(this);
+  }
+
   public void onCreate(Bundle saved) {
     super.onCreate(saved);
     vm = new ViewModelProvider(this).get(HomeViewModel.class);

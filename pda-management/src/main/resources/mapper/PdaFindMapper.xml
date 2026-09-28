@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.PdaFindMapper">
+  <select id="lastPushEvent" resultType="String">
+    SELECT l.event FROM pda_find_requests r JOIN pda_alert_logs l ON l.request_id=r.id
+    WHERE r.device_id=#{deviceId} AND r.store_id=#{storeId}
+      AND l.event IN ('RETRY','INVALID_TOKEN','NO_TOKEN','PUSH_FIND','PUSH_STOP')
+    ORDER BY l.id DESC LIMIT 1
+  </select>
+  <select id="commands" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity">
+    SELECT id,requester_id,store_id,device_id,status,expires_at FROM pda_find_requests
+    WHERE device_id=#{deviceId} AND store_id=#{storeId} AND expires_at&gt;now()
+    ORDER BY created_at,id
+  </select>
   <select id="find" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity">
     SELECT id,requester_id,store_id,device_id,status,expires_at FROM pda_find_requests WHERE id=#{id} AND store_id=#{storeId}
   </select>

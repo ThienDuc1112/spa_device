@@ -32,6 +32,8 @@ Production environments should separate the migration owner from the runtime dat
 
 ## Firebase and managed PDAs
 
+Finder also supports HTTP polling without Firebase. For background/locked-screen operation, provision the managed-device power policy and start the persistent service from Home as described in [finder polling](15-finder-polling.md). The Firebase steps below configure the additional push transport.
+
 1. Create/register Android package `com.company.pda` in your Firebase project. Put its client `google-services.json` in `pda-android/app/`; it is excluded from version control. Enable FCM HTTP v1.
 2. Enable `FCM_ENABLED=true` on the backend. Prefer workload identity/application default credentials with only messaging permission. For local credentials, mount the service-account JSON read-only and set `GOOGLE_APPLICATION_CREDENTIALS` to its container path. Do not put JSON private keys in the repository or APK. The base Compose file does not mount any credential automatically.
 3. Install the APK on a Google Play services-enabled PDA, allow notifications and launch once. Force-stopped apps cannot receive normal FCM until relaunched. Validate OEM battery/device policy behavior in your fleet.

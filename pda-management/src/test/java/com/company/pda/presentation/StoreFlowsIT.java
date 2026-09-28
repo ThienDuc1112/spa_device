@@ -54,6 +54,7 @@ class StoreFlowsIT {
   @Autowired ObjectMapper json;
   @Autowired PasswordEncoder passwords;
   @Autowired OutboxProcessor worker;
+  @Autowired com.company.pda.domain.pdafinder.repository.PdaFindRepository finderRequests;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
   @MockitoBean NotificationPort push;
   String manager, employee, other;
@@ -267,6 +268,39 @@ class StoreFlowsIT {
   }
 
   @Test
+  void fcmHealthAuthenticatesDeviceAndTracksLatestPushResultOnly() throws Exception {
+    var device = register();
+    long id = device.get("deviceId").asLong();
+    String secret = device.get("deviceSecret").asText();
+    mvc.perform(get("/pda/fcm-health").header("X-Device-Id", id).header("X-Device-Secret", "wrong"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/pda/fcm-health").header("X-Device-Id", id).header("X-Device-Secret", secret))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("fallbackRequired").value(true))
+        .andExpect(jsonPath("reason").value("FCM_DISABLED"));
+    var request =
+        body(
+            postJson("/pda/find", manager, Map.of("deviceId", id))
+                .andExpect(status().isOk())
+                .andReturn());
+    var requestId = UUID.fromString(request.get("id").asText());
+    assertNull(finderRequests.lastPushEvent(id, 1));
+    doThrow(new IllegalStateException("FCM unavailable"))
+        .when(push)
+        .send(any(), any(), any(), any());
+    worker.processOne();
+    assertEquals("RETRY", finderRequests.lastPushEvent(id, 1));
+    assertNull(finderRequests.lastPushEvent(id, 2));
+    finderRequests.log(requestId, id, "RINGING", null);
+    assertEquals("RETRY", finderRequests.lastPushEvent(id, 1));
+    reset(push);
+    db.update("UPDATE outbox_events SET available_at=now()");
+    worker.processOne();
+    assertEquals("PUSH_FIND", finderRequests.lastPushEvent(id, 1));
+  }
+
+  @Test
   void finderPersistsPushAndInvalidTokenIsRemoved() throws Exception {
     var device = register();
     long id = device.get("deviceId").asLong();
@@ -280,11 +314,113 @@ class StoreFlowsIT {
     worker.processOne();
     assertNull(db.queryForObject("SELECT fcm_token FROM devices WHERE id=?", String.class, id));
     assertEquals(
-        "FAILED",
+        "QUEUED",
         db.queryForObject(
             "SELECT status FROM pda_find_requests WHERE id=?",
             String.class,
             UUID.fromString(request.get("id").asText())));
+  }
+
+  @Test
+  void pollingSurvivesPushFailureAndDeliversStopWithDeviceIsolation() throws Exception {
+    var device = register();
+    long id = device.get("deviceId").asLong();
+    String secret = device.get("deviceSecret").asText();
+    var request =
+        body(
+            postJson("/pda/find", manager, Map.of("deviceId", id))
+                .andExpect(status().isOk())
+                .andReturn());
+    String requestId = request.get("id").asText();
+    doThrow(new NotificationPort.InvalidToken()).when(push).send(any(), any(), any(), any());
+    worker.processOne();
+    mvc.perform(get("/pda/commands").header("X-Device-Id", id).header("X-Device-Secret", "wrong"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/pda/commands")).andExpect(status().isBadRequest());
+    mvc.perform(get("/pda/commands").header("X-Device-Id", id).header("X-Device-Secret", secret))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].requestId").value(requestId))
+        .andExpect(jsonPath("$[0].command").value("FIND"));
+    var another =
+        body(
+            postJson(
+                    "/devices/register",
+                    other,
+                    Map.of("deviceCode", "PDA2", "deviceName", "Other store PDA"))
+                .andExpect(status().isOk())
+                .andReturn());
+    mvc.perform(
+            get("/pda/commands")
+                .header("X-Device-Id", another.get("deviceId").asLong())
+                .header("X-Device-Secret", another.get("deviceSecret").asText()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+    mvc.perform(
+            post("/pda/events")
+                .header("X-Device-Id", id)
+                .header("X-Device-Secret", secret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(Map.of("requestId", requestId, "status", "RINGING"))))
+        .andExpect(status().isOk());
+    assertEquals(
+        "RINGING", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
+    postJson("/pda/stop", manager, Map.of("requestId", requestId)).andExpect(status().isOk());
+    mvc.perform(get("/pda/commands").header("X-Device-Id", id).header("X-Device-Secret", secret))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].command").value("STOP"));
+    db.update("UPDATE pda_find_requests SET expires_at=now()-interval '1 second'");
+    mvc.perform(get("/pda/commands").header("X-Device-Id", id).header("X-Device-Secret", secret))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+    // The invalidated push token no longer prevents subsequent HTTP-delivered requests.
+    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+  }
+
+  @Test
+  void exhaustedPushRetriesLeavePollingAvailableUntilExpiry() throws Exception {
+    var device = register();
+    long id = device.get("deviceId").asLong();
+    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+    db.update("UPDATE outbox_events SET attempts=7");
+    doThrow(new IllegalStateException("FCM disabled")).when(push).send(any(), any(), any(), any());
+    worker.processOne();
+    assertEquals("QUEUED", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
+    assertNotNull(db.queryForObject("SELECT processed_at FROM outbox_events", Object.class));
+    mvc.perform(
+            get("/pda/commands")
+                .header("X-Device-Id", id)
+                .header("X-Device-Secret", device.get("deviceSecret").asText()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].command").value("FIND"));
+    db.update("UPDATE pda_find_requests SET expires_at=now()-interval '1 second'");
+    worker.expire();
+    assertEquals(
+        "EXPIRED", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
+  }
+
+  @Test
+  void deviceWithoutFirebaseCanRegisterAndReceiveCommands() throws Exception {
+    var device =
+        body(
+            postJson(
+                    "/devices/register",
+                    manager,
+                    Map.of("deviceCode", "NOFCM", "deviceName", "Polling PDA"))
+                .andExpect(status().isOk())
+                .andReturn());
+    long id = device.get("deviceId").asLong();
+    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+    worker.processOne();
+    verifyNoInteractions(push);
+    mvc.perform(
+            get("/pda/commands")
+                .header("X-Device-Id", id)
+                .header("X-Device-Secret", device.get("deviceSecret").asText()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].command").value("FIND"));
   }
 
   @Test

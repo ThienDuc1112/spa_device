@@ -51,7 +51,7 @@ Refresh with `{"refreshToken":"<current refresh JWT>"}`. Each refresh is single 
 {"deviceCode":"PDA-001","deviceName":"Receiving PDA","fcmToken":"<Firebase registration token>"}
 ```
 
-Registration returns `{"deviceId":1,"deviceSecret":"<one-time random secret>"}`. Device code is unique, max 100 characters; name max 255; push token required, max 4096. Store is derived from the registering manager. Persist the device secret immediately. Updating `/devices/token` sends `{"fcmToken":"<latest token>"}` and refreshes the last-active timestamp. Last activity is observational, not proof of current reachability.
+Registration returns `{"deviceId":1,"deviceSecret":"<one-time random secret>"}`. Device code is unique, max 100 characters; name max 255; push token optional (polling-only registration), max 4096. Store is derived from the registering manager. Persist the device secret immediately. Updating `/devices/token` sends `{"fcmToken":"<latest token>"}` and refreshes the last-active timestamp. Last activity is observational, not proof of current reachability.
 
 Find: `{"deviceId":1}` →
 
@@ -60,7 +60,7 @@ Find: `{"deviceId":1}` →
 ```
 
 Stop: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa"}`.
-Event: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","status":"RINGING"}`. Allowed device statuses: RINGING, STOPPED, FAILED. Terminal requests cannot return to an active state. Timeout is server-configurable and clamped to 10–300 seconds. A missing token returns 409; a stale token can later produce FAILED; an offline device can remain SENT without RINGING and then expire.
+Event: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","status":"RINGING"}`. Allowed device statuses: RINGING, STOPPED, FAILED. Terminal requests cannot return to an active state. Timeout is server-configurable and clamped to 10–300 seconds. Missing/invalid push tokens and exhausted push retries leave the request available to HTTP polling until expiry. GET /pda/commands authenticates X-Device-Id and X-Device-Secret and returns unexpired commands for that device only; see [polling](15-finder-polling.md). An offline device can remain SENT without RINGING and then expire.
 
 ## Products and image publication
 

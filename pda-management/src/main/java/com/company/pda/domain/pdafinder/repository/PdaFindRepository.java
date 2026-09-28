@@ -5,6 +5,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface PdaFindRepository {
+  String lastPushEvent(long deviceId, long storeId);
+
+  java.util.List<PdaFindRequest> commands(long deviceId, long storeId);
+
   PdaFindRequest find(UUID id, long storeId);
 
   int create(UUID id, long actorId, long storeId, long deviceId, Instant expiresAt);
