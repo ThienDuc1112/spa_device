@@ -15,7 +15,7 @@ sequenceDiagram
  W->>DB: Claim due row (SKIP LOCKED)
  W->>F: High-priority data push with expiry
  F-->>W: Accepted / invalid token / transient failure
- W->>DB: SENT or retry / FAILED
+ W->>DB: SENT or retry; push exhaustion leaves HTTP polling available
  F->>D: Deliver if reachable before expiry
  D->>D: Start foreground alarm; show notification/dialog
  D->>API: Device-authenticated RINGING event

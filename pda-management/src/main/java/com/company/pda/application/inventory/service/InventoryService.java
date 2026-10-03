@@ -47,10 +47,10 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
 
   @Transactional
   public Inventory adjust(AdjustInventoryCommand b) {
-    var a = actor.get();
+    lombok.val a = actor.get();
     repo.lockStore(a.storeId());
-    var p = found(products.code(b.productCode()));
-    var previous = repo.adjustmentById(b.requestId(), a.storeId());
+    lombok.val p = found(products.code(b.productCode()));
+    lombok.val previous = repo.adjustmentById(b.requestId(), a.storeId());
     if (previous != null) {
       require(
           previous.productId() == p.id()
@@ -61,7 +61,7 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
           "Request ID already used with different content");
       return found(repo.find(a.storeId(), p.id()));
     }
-    var stock = found(repo.find(a.storeId(), p.id()));
+    lombok.val stock = found(repo.find(a.storeId(), p.id()));
     require(stock.version() == b.version(), "Inventory changed; reload and retry");
     require(
         repo.update(a.storeId(), p.id(), b.quantity(), b.version()) == 1,
@@ -83,8 +83,8 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
   @Override
   public void deduct(Actor a, long productId, BigDecimal quantity, UUID disposalId) {
     require(quantity.signum() > 0, "Quantity must be positive");
-    var stock = found(repo.find(a.storeId(), productId));
-    var next = stock.quantity().subtract(quantity);
+    lombok.val stock = found(repo.find(a.storeId(), productId));
+    lombok.val next = stock.quantity().subtract(quantity);
     if (next.signum() < 0) throw new InsufficientInventoryException();
     require(
         repo.update(a.storeId(), productId, next, stock.version()) == 1,

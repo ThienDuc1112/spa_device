@@ -3,8 +3,8 @@ package com.company.pda.presentation.rest.disposal;
 import com.company.pda.application.disposal.usecase.DisposalUseCase;
 import com.company.pda.presentation.rest.disposal.dto.CreateDisposalRequest;
 import com.company.pda.presentation.rest.disposal.dto.DisposalTransitionRequest;
-import jakarta.validation.Valid;
 import java.util.UUID;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 

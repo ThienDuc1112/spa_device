@@ -55,31 +55,35 @@ public class DisposalService implements DisposalUseCase {
 
   @Transactional(readOnly = true)
   public Object detail(UUID id) {
-    var d = found(repo.find(id, actor.get().storeId()));
-    return Map.of("disposal", d, "items", repo.items(id), "history", repo.history(id));
+    lombok.val d = found(repo.find(id, actor.get().storeId()));
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("disposal", d);
+    detail.put("items", repo.items(id));
+    detail.put("history", repo.history(id));
+    return Collections.unmodifiableMap(detail);
   }
 
   @Transactional
   public Disposal create(CreateDisposalCommand body) {
-    var a = actor.get();
-    var old = repo.find(body.requestId(), a.storeId());
-    var items =
+    lombok.val a = actor.get();
+    lombok.val old = repo.find(body.requestId(), a.storeId());
+    lombok.val items =
         body.items().stream()
             .map(
                 i ->
                     new DisposalItem(
                         found(products.code(i.productCode())).id(), i.quantity(), i.reason()))
             .sorted(Comparator.comparingLong(DisposalItem::productId))
-            .toList();
+            .collect(java.util.stream.Collectors.toList());
     require(
         items.stream().map(DisposalItem::productId).distinct().count() == items.size(),
         "Duplicate product in disposal");
     if (old != null) {
-      var stored = repo.items(old.id());
+      lombok.val stored = repo.items(old.id());
       boolean same = stored.size() == items.size();
       for (int i = 0; same && i < items.size(); i++) {
-        var x = items.get(i);
-        var y = stored.get(i);
+        lombok.val x = items.get(i);
+        lombok.val y = stored.get(i);
         same =
             x.productId() == y.productId()
                 && x.quantity().compareTo(y.quantity()) == 0
@@ -91,7 +95,7 @@ public class DisposalService implements DisposalUseCase {
       return old;
     }
     repo.create(body.requestId(), a.storeId(), body.remarks(), a.id());
-    for (var i : items) repo.item(body.requestId(), i.productId(), i.quantity(), i.reason());
+    for (lombok.val i : items) repo.item(body.requestId(), i.productId(), i.quantity(), i.reason());
     repo.historyAdd(body.requestId(), null, DisposalStatus.PENDING.name(), a.id());
     ops.audit(a.id(), a.storeId(), "DISPOSAL_CREATE", body.requestId().toString());
     return found(repo.find(body.requestId(), a.storeId()));
@@ -99,14 +103,15 @@ public class DisposalService implements DisposalUseCase {
 
   @Transactional
   public Disposal transition(UUID id, long version, boolean confirm) {
-    var a = actor.get();
+    lombok.val a = actor.get();
     inventory.lockStore(a.storeId());
-    var d = found(repo.lock(id, a.storeId()));
+    lombok.val d = found(repo.lock(id, a.storeId()));
     String target = confirm ? DisposalStatus.CONFIRMED.name() : DisposalStatus.CANCELLED.name();
     if (d.status().equals(target)) return d;
     require(d.status().equals(DisposalStatus.PENDING.name()), "Disposal is already finalized");
     require(d.version() == version, "Disposal changed; reload");
-    if (confirm) for (var i : repo.items(id)) inventory.deduct(a, i.productId(), i.quantity(), id);
+    if (confirm)
+      for (lombok.val i : repo.items(id)) inventory.deduct(a, i.productId(), i.quantity(), id);
     require(repo.transition(id, target, version) == 1, "Disposal changed; reload");
     repo.historyAdd(id, d.status(), target, a.id());
     ops.audit(a.id(), a.storeId(), "DISPOSAL_" + target, id.toString());

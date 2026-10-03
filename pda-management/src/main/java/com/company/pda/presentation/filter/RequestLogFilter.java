@@ -1,9 +1,9 @@
 package com.company.pda.presentation.filter;
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.util.UUID;
+import javax.servlet.*;
+import javax.servlet.http.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;

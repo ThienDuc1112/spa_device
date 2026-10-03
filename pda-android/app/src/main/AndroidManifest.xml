@@ -1,26 +1,80 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
- <uses-permission android:name="android.permission.INTERNET"/>
- <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
- <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
- <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
- <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
- <uses-permission android:name="android.permission.WAKE_LOCK"/>
- <application android:name=".PdaApplication" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:label="Store PDA" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="true">
-  <activity android:name=".presentation.auth.LoginActivity" android:exported="true">
-   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-  </activity>
-  <activity android:name=".presentation.home.HomeActivity" android:exported="false" android:launchMode="singleTop"/>
-  <activity android:name=".presentation.pdafinder.PdaFinderActivity" android:exported="false"/>
-  <activity android:name=".presentation.pdafinder.FinderSoundActivity" android:exported="false"/>
-  <service android:name=".infrastructure.firebase.PdaFirebaseMessagingService" android:exported="false">
-   <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>
-  </service>
-  <service android:name=".infrastructure.alarm.PdaAlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback"/>
-  <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>
-  <provider android:name="androidx.startup.InitializationProvider" android:authorities="${applicationId}.androidx-startup" android:exported="false" tools:node="merge">
-   <meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove"/>
-  </provider>
- </application>
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name=".PdaApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
+        android:label="Store PDA"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false">
+        <activity
+            android:name=".presentation.auth.LoginActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".presentation.home.HomeActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+        <activity
+            android:name=".presentation.pdafinder.PdaFinderActivity"
+            android:exported="false" />
+        <activity
+            android:name=".presentation.pdafinder.FinderSoundActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".infrastructure.firebase.PdaFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".infrastructure.alarm.PdaAlarmService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name=".infrastructure.firebase.FinderPollingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Continuous device-finder command reception on enterprise-managed PDAs when push delivery is unavailable, including locked-screen operation" />
+        </service>
+
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
+
+    </application>
+
 </manifest>

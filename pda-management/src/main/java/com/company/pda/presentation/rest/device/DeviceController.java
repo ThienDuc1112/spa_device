@@ -4,7 +4,7 @@ import com.company.pda.application.device.dto.DeviceRegistrationResult;
 import com.company.pda.application.device.usecase.DeviceUseCase;
 import com.company.pda.presentation.rest.device.dto.RegisterDeviceRequest;
 import com.company.pda.presentation.rest.device.dto.UpdateFcmTokenRequest;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 

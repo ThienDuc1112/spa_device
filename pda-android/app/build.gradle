@@ -1,7 +1,7 @@
 plugins { 
     id 'com.android.application'
-    id 'com.google.gms.google-services'
-     }
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
 if (file('google-services.json').exists()) { apply plugin: 'com.google.gms.google-services' }
 
 android {
@@ -14,23 +14,46 @@ android {
         versionCode 1
         versionName '1.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        buildConfigField 'String', 'API_URL', '"' + (project.findProperty('apiUrl') ?: 'https://pda.example.com/') + '"'
+        buildConfigField 'String', 'API_URL', '"' + (project.findProperty('apiUrl') ?: 'http://10.0.2.2:8080/') + '"'
     }
-    buildFeatures { dataBinding true; buildConfig true }
+    buildFeatures { dataBinding true; buildConfig true
+        compose true
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17; coreLibraryDesugaringEnabled true }
-    buildTypes { release { minifyEnabled true; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' } }
+    buildTypes {
+        debug {
+            buildConfigField 'String', 'API_URL', '"' + (project.findProperty('apiUrl') ?: 'http://10.0.2.2:8080/') + '"'
+        }
+        release { minifyEnabled true; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' }
+    }
 }
 dependencies {
+    // Keep these families compatible with compileSdk 35 / AGP 8.9.1.
+    def composeBomVersion = '2025.03.00'
+    def activityVersion = '1.10.1'
+    def lifecycleVersion = '2.8.7'
+    implementation platform("androidx.compose:compose-bom:$composeBomVersion")
     implementation project(':scanner-factory')
     implementation project(':device-factory')
+    implementation "androidx.activity:activity-compose:$activityVersion"
+    implementation "androidx.activity:activity-ktx:$activityVersion"
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.fragment:fragment:1.8.6'
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion"
+    implementation 'com.google.android.material:material:1.10.0'
+    androidTestImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.activity:activity:1.10.1'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7'
-    implementation 'androidx.lifecycle:lifecycle-livedata:2.8.7'
+    implementation "androidx.activity:activity:$activityVersion"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-savedstate:$lifecycleVersion"
+    implementation "androidx.lifecycle:lifecycle-livedata:$lifecycleVersion"
     implementation 'androidx.room:room-runtime:2.6.1'
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
     implementation 'androidx.work:work-runtime:2.10.0'
@@ -41,4 +64,6 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:33.10.0')
     implementation 'com.google.firebase:firebase-messaging'
     testImplementation 'junit:junit:4.13.2'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
 }

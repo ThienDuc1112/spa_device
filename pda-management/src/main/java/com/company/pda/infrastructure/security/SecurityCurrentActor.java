@@ -17,8 +17,8 @@ public class SecurityCurrentActor implements CurrentActor {
   }
 
   public Actor get() {
-    var jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    var user = users.userById(Long.parseLong(jwt.getSubject()));
+    lombok.val jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    lombok.val user = users.userById(Long.parseLong(jwt.getSubject()));
     if (user == null
         || !user.active()
         || user.storeId() != ((Number) jwt.getClaim("storeId")).longValue())

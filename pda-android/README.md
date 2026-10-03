@@ -42,6 +42,8 @@ Manual dependency injection lives in `di/AppModule`; no Hilt/Dagger setup is req
 
 Use JDK 21 and Android SDK 35. Set `ANDROID_HOME` or an untracked `local.properties`.
 
+The app keeps Activity at 1.10.1, Lifecycle at 2.8.7, and Compose BOM at 2025.03.00 to match `compileSdk 35` and AGP 8.9.1. App and instrumentation dependencies use the same Compose BOM. Updating these families independently can pull transitive AARs that require a newer SDK or AGP. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app. See the [Compose BOM documentation](https://developer.android.com/develop/ui/compose/bom).
+
 ~~~sh
 ./gradlew :app:assembleDebug :app:assembleRelease
 ./gradlew :app:testDebugUnitTest :scanner-factory:testDebugUnitTest :device-android:testDebugUnitTest :app:lintDebug
@@ -51,7 +53,11 @@ Use JDK 21 and Android SDK 35. Set `ANDROID_HOME` or an untracked `local.propert
 
 On Windows, use `gradlew.bat`. Release APKs are unsigned until enterprise signing is configured.
 
-Set your HTTPS origin, including a trailing slash:
+Debug builds default to `http://10.0.2.2:8080/`, which connects the Android emulator to Spring Boot running on the development computer. Start PostgreSQL and the backend before signing in. HTTP is enabled only in debug builds.
+
+For a physical device, use the computer's LAN IP (on the same network), for example `-PapiUrl=http://192.168.1.100:8080/`, and allow inbound access to the backend port. Rebuild and reinstall after changing the URL.
+
+Override the API origin with a trailing slash; release builds require your deployed HTTPS origin (`pda.example.com` is a placeholder):
 
 ~~~sh
 ./gradlew :app:assembleDebug -PapiUrl=https://pda.example.com/

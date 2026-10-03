@@ -2,7 +2,7 @@ package com.company.pda.presentation.rest.inventory;
 
 import com.company.pda.application.inventory.usecase.InventoryUseCase;
 import com.company.pda.presentation.rest.inventory.dto.AdjustInventoryRequest;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 

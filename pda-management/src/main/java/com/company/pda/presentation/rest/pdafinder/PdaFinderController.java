@@ -5,8 +5,8 @@ import com.company.pda.presentation.rest.pdafinder.dto.FindPdaRequest;
 import com.company.pda.presentation.rest.pdafinder.dto.FindPdaResponse;
 import com.company.pda.presentation.rest.pdafinder.dto.PdaAlertEventRequest;
 import com.company.pda.presentation.rest.pdafinder.dto.StopPdaRequest;
-import jakarta.validation.Valid;
 import java.util.UUID;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,5 +43,25 @@ public class PdaFinderController {
       @RequestHeader("X-Device-Secret") String secret,
       @Valid @RequestBody PdaAlertEventRequest b) {
     service.event(id, secret, b.toCommand());
+  }
+
+  @GetMapping("/commands")
+  public org.springframework.http.ResponseEntity<
+          java.util.List<com.company.pda.application.pdafinder.dto.DeviceFinderCommand>>
+      commands(
+          @RequestHeader("X-Device-Id") long id, @RequestHeader("X-Device-Secret") String secret) {
+    return org.springframework.http.ResponseEntity.ok()
+        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .body(service.commands(id, secret));
+  }
+
+  @GetMapping("/fcm-health")
+  public org.springframework.http.ResponseEntity<
+          com.company.pda.application.pdafinder.dto.FcmHealthResult>
+      fcmHealth(
+          @RequestHeader("X-Device-Id") long id, @RequestHeader("X-Device-Secret") String secret) {
+    return org.springframework.http.ResponseEntity.ok()
+        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .body(service.fcmHealth(id, secret));
   }
 }

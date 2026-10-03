@@ -59,6 +59,8 @@ Additional files beyond the example tree support existing endpoints, device cred
 
 ## Build
 
+The backend uses Java 8, Spring Boot 2.7.0 and executable WAR packaging. See [migration notes and dependency decisions](JAVA8_MIGRATION.vi.md).
+
 Run these commands from this directory:
 
 ```sh
@@ -71,4 +73,4 @@ Or from the workspace root:
 mvn -f pda-management/pom.xml verify
 ```
 
-The project requires JDK 21. To build the Docker image or start the whole stack, run `docker compose up --build -d` from the workspace root. Copy the workspace `.env.example` to `.env` and configure its required secrets first. Firebase credentials are optional for startup and required only when FCM push is enabled.
+The project requires JDK 8. To build the Docker image or start the whole stack, run `docker compose up --build -d` from the workspace root. Copy the workspace `.env.example` to `.env` and configure its required secrets first. Firebase credentials are optional for startup and required only when FCM push is enabled.

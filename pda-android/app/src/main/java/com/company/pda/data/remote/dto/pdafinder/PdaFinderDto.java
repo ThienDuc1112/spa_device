@@ -1,6 +1,15 @@
 package com.company.pda.data.remote.dto.pdafinder;
 
 public final class PdaFinderDto {
+  public static class FcmHealth {
+    public boolean fallbackRequired;
+    public String reason;
+  }
+
+  public static class Command {
+    public String requestId, command, expiresAt;
+  }
+
   public static class Device {
     public long id;
     public String deviceCode, deviceName, lastActiveAt;

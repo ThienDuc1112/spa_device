@@ -1,5 +1,25 @@
 # Verification results
 
+## Finder conflict and stale expiry — 2026-10-03
+
+Java 8 `mvn verify`: **BUILD SUCCESS**, 12 unit tests and 30 integration tests passed. New checks cover replacing expired QUEUED/SENT/RINGING requests with the scheduler disabled, store isolation during expiry, expiry audit logs, skipping obsolete outbox messages, and concurrent Find calls producing exactly one request/outbox event. An unexpired duplicate returns a specific HTTP 409 message. Existing database migrations and unique indexes are unchanged; tests used an isolated embedded database.
+
+## Android AAR metadata compatibility — 2026-10-03
+
+Aligned Activity dependencies to 1.10.1, Lifecycle to 2.8.7, and app/instrumentation Compose BOM to 2025.03.00 for compileSdk 35 / AGP 8.9.1. Removed a dangling `SummaryActivity` manifest entry: neither that class nor its title resource exists in the source tree.
+
+With JDK 21 and Gradle 8.11.1, `:app:checkDebugAarMetadata :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest` completed with **BUILD SUCCESSFUL**. Both app and instrumentation AAR metadata checks passed, and debug APKs were generated. Instrumentation tests were compiled, not executed on a device during this check.
+
+## Java 8 / Spring Boot 2.7 / WAR — 2026-10-03
+
+Ran `mvn -f pda-management/pom.xml clean verify` with Oracle JDK 1.8.0_202 and the workspace Maven cache: **BUILD SUCCESS**, 12 unit tests and 26 integration tests passed, with no failures, errors or skips. Integration tests used an isolated embedded PostgreSQL database; no application database was changed.
+
+Additional compatibility checks cover immutable DTO JSON round trips and MapStruct mapping, SHA-256 output, ERP/image HTTP adapters (success, 404, remote error and invalid content type), offline Firebase initialization, and the HTTP problem-response contract. Firebase delivery to an actual device was not exercised.
+
+The generated `pda-management/target/pda-management-1.0.0.war` declares Spring Boot 2.7.0 and `WarLauncher`. Application classes use bytecode version 52 (Java 8); scanning dependency base classes found none requiring a newer JVM, excluding module descriptors and multi-release variants. Tomcat core/websocket are in `WEB-INF/lib-provided`. Docker image build, PostgreSQL 16 deployment and deployment into an external Tomcat were not run.
+
+Dependency changes and run instructions: [Java 8 migration notes](../pda-management/JAVA8_MIGRATION.vi.md).
+
 ## User registration and development seed — 2026-09-26
 
 Ran Maven `verify` on Java 21: **BUILD SUCCESS**, 6 unit tests and 21 integration tests passed, with no failures, errors or skips. The added checks cover manager-only employee registration, anonymous/employee denial, store and role isolation, duplicate usernames, password validation (including BCrypt UTF-8 length), password hashing and new-account login. Development seed checks verify repeat execution preserves existing credentials, inventory and disposal state; profile checks exclude production, including simultaneous `dev,prod` activation.

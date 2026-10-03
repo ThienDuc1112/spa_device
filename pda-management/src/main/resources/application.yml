@@ -1,13 +1,15 @@
 spring:
+  profiles:
+    active: dev
+  flyway:
+    enabled: true
+    locations: classpath:db/legacy
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/retail}
-    username: ${DATABASE_USER:retail}
-    password: ${DATABASE_PASSWORD}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/pda}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:12345678}
   jackson:
     default-property-inclusion: always
-  mvc:
-    problemdetails:
-      enabled: true
 server:
   shutdown: graceful
   error:
@@ -17,15 +19,21 @@ mybatis:
   type-handlers-package: com.company.pda.infrastructure.persistence.mybatis
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 management:
   endpoints:
     web:
       exposure:
         include: health,info
 app:
-  jwt-secret: ${JWT_SECRET}
+  jwt-secret: "rebZ2O/rhVdDbHI1E3pSFnnLodA+O8aeg4UKVUmX0q8="
   issuer: retail-pda
   fcm-enabled: ${FCM_ENABLED:false}
   finder-timeout-seconds: ${FINDER_TIMEOUT_SECONDS:60}
   bootstrap:
     enabled: ${APP_BOOTSTRAP_ENABLED:false}
+logging:
+  level:
+    root: INFO
+    com.company.pda.infrastructure.persistence.mybatis: DEBUG
+    org.apache.ibatis: DEBUG

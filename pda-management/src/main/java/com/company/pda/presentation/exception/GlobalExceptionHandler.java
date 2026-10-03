@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.*;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
   @ExceptionHandler(DomainException.class)
-  ErrorResponse business(DomainException e) {
-    return ErrorResponse.of(e.status, e.getMessage());
+  ResponseEntity<ErrorResponse> business(
+      DomainException e, javax.servlet.http.HttpServletRequest request) {
+    return ErrorResponse.of(e.status, e.getMessage(), request);
   }
 
   @ExceptionHandler({
@@ -21,27 +22,32 @@ public class GlobalExceptionHandler {
     org.springframework.web.bind.ServletRequestBindingException.class,
     org.springframework.http.converter.HttpMessageNotReadableException.class,
     org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
-    jakarta.validation.ConstraintViolationException.class
+    javax.validation.ConstraintViolationException.class
   })
-  ErrorResponse validation(Exception e) {
-    return ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Invalid request fields");
+  ResponseEntity<ErrorResponse> validation(
+      Exception e, javax.servlet.http.HttpServletRequest request) {
+    return ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Invalid request fields", request);
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)
-  ErrorResponse conflict(Exception e) {
-    return ErrorResponse.of(HttpStatus.CONFLICT.value(), "Duplicate request or inconsistent data");
+  ResponseEntity<ErrorResponse> conflict(
+      Exception e, javax.servlet.http.HttpServletRequest request) {
+    return ErrorResponse.of(
+        HttpStatus.CONFLICT.value(), "Duplicate request or inconsistent data", request);
   }
 
   @ExceptionHandler(AccessDeniedException.class)
-  ErrorResponse forbidden(Exception e) {
-    return ErrorResponse.of(HttpStatus.FORBIDDEN.value(), "Permission denied");
+  ResponseEntity<ErrorResponse> forbidden(
+      Exception e, javax.servlet.http.HttpServletRequest request) {
+    return ErrorResponse.of(HttpStatus.FORBIDDEN.value(), "Permission denied", request);
   }
 
   @ExceptionHandler(Exception.class)
-  ErrorResponse unexpected(Exception e) {
+  ResponseEntity<ErrorResponse> unexpected(
+      Exception e, javax.servlet.http.HttpServletRequest request) {
     String ref = java.util.UUID.randomUUID().toString();
     log.error("Unhandled failure {}", ref, e);
     return ErrorResponse.of(
-        HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal error; reference " + ref);
+        HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal error; reference " + ref, request);
   }
 }

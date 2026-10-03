@@ -47,7 +47,7 @@ public class MyBatisInventoryRepository implements InventoryRepository {
 
   @Override
   public InventoryAdjustment adjustmentById(UUID id, long storeId) {
-    var row = mapper.adjustmentById(id, storeId);
+    lombok.val row = mapper.adjustmentById(id, storeId);
     return row == null
         ? null
         : new InventoryAdjustment(
