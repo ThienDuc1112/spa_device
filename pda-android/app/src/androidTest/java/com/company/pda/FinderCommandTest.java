@@ -15,6 +15,28 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class FinderCommandTest {
   @Test
+  public void tokenRecoveryDoesNotHideAnUnrecoveredDeliveryFailure() {
+    PdaApplication app = ApplicationProvider.getApplicationContext();
+    var tokens = app.modules().tokens;
+    String originalToken = tokens.get("fcmToken"), originalFailure = tokens.get("fcmFailure");
+    try {
+      tokens.put("fcmToken", null);
+      assertTrue(app.modules().fcm.unavailable());
+      app.modules().fcm.failed("TOKEN_ERROR");
+      app.modules().fcm.refreshed("local-test-token");
+      assertFalse(app.modules().fcm.unavailable());
+      app.modules().fcm.failed("DELIVERY_ERROR");
+      app.modules().fcm.refreshed("local-test-token");
+      assertTrue(app.modules().fcm.unavailable());
+      app.modules().fcm.received();
+      assertFalse(app.modules().fcm.unavailable());
+    } finally {
+      tokens.put("fcmToken", originalToken);
+      tokens.put("fcmFailure", originalFailure);
+    }
+  }
+
+  @Test
   public void pollingRemainsForegroundAfterActivityCloses() {
     PdaApplication app = ApplicationProvider.getApplicationContext();
     var tokens = app.modules().tokens;

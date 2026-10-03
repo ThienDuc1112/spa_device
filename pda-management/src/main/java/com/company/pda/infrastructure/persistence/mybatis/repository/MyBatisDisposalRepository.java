@@ -30,12 +30,16 @@ public class MyBatisDisposalRepository implements DisposalRepository {
 
   @Override
   public java.util.List<Disposal> list(long storeId, int offset) {
-    return mapper.list(storeId, offset).stream().map(DisposalEntityMapper::toDomain).toList();
+    return mapper.list(storeId, offset).stream()
+        .map(DisposalEntityMapper::toDomain)
+        .collect(java.util.stream.Collectors.toList());
   }
 
   @Override
   public java.util.List<DisposalItem> items(UUID id) {
-    return mapper.items(id).stream().map(DisposalItemEntityMapper::toDomain).toList();
+    return mapper.items(id).stream()
+        .map(DisposalItemEntityMapper::toDomain)
+        .collect(java.util.stream.Collectors.toList());
   }
 
   @Override

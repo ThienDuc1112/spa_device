@@ -136,7 +136,7 @@ Nếu token bị Firebase báo không còn đăng ký, backend vô hiệu hóa t
 
 ## 6. PDA đích nhận lệnh và phát chuông
 
-Polling chạy song song qua `GET /pda/commands` để nhận FIND/STOP khi FCM không tới máy. Service chạy nền với thông báo thường trực trên PDA đã cấu hình chính sách pin. Xem [cơ chế polling](15-finder-polling.md).
+Service kiểm tra `GET /pda/fcm-health` mỗi 15 giây. Chỉ khi PDA hoặc backend ghi nhận lỗi FCM mới gọi `GET /pda/commands` để nhận FIND/STOP theo nhịp 5 giây. Service chạy nền với thông báo thường trực trên PDA đã cấu hình chính sách pin. Xem [điều kiện polling](15-finder-polling.md).
 
 `PdaFirebaseMessagingService.onMessageReceived()` chuyển payload tới `FinderCommandHandler` dùng chung với polling để kiểm tra:
 
@@ -145,7 +145,7 @@ Polling chạy song song qua `GET /pda/commands` để nhận FIND/STOP khi FCM 
 - `FIND` phải chưa được đánh dấu `handled:<requestId>` và chưa hết hạn.
 - Message `FIND` phải có priority thực nhận là `HIGH`.
 
-Nếu priority không đạt hoặc khởi động chuông ném lỗi runtime, app thử hiện notification dự phòng và giữ đường polling mở tới khi hết hạn. Lỗi phát âm thanh thực tế vẫn báo `FAILED`.
+Nếu priority không đạt, app ghi lỗi delivery để bật polling và hiện notification dự phòng. Nếu khởi động chuông ném lỗi runtime, app hiện notification nhưng không tự coi lỗi Android này là lỗi FCM. Lỗi phát âm thanh thực tế vẫn báo `FAILED`.
 
 Luồng bắt đầu chuông hợp lệ:
 
@@ -285,6 +285,7 @@ Màn hình này cho xem lý do lỗi âm thanh gần nhất, mở thiết lập 
 | `POST /pda/stop` | Yêu cầu dừng từ xa | Người dùng có quyền manager |
 | `POST /pda/events` | PDA báo RINGING/STOPPED/FAILED | Device ID + device secret |
 | `GET /pda/commands` | PDA lấy FIND/STOP dự phòng qua HTTP | Device ID + device secret |
+| `GET /pda/fcm-health` | Kiểm tra lỗi FCM phía backend để quyết định polling | Device ID + device secret |
 
 Các đường dẫn trên là đường dẫn endpoint trong code; app ghép chúng với API base URL được cấu hình.
 

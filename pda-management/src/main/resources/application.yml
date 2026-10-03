@@ -10,9 +10,6 @@ spring:
     password: ${DATABASE_PASSWORD:12345678}
   jackson:
     default-property-inclusion: always
-  mvc:
-    problemdetails:
-      enabled: true
 server:
   shutdown: graceful
   error:

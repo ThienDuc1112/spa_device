@@ -30,7 +30,7 @@ public class UserRegistrationService implements RegisterUserUseCase {
   @Override
   @Transactional
   public RegisterUserResult register(RegisterUserCommand command) {
-    var manager = actor.get();
+    lombok.val manager = actor.get();
     if (!users.roles(manager.id()).contains("MANAGER")) {
       throw new DomainException(403, "Only managers may register employees");
     }

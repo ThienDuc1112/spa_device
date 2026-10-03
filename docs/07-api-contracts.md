@@ -62,6 +62,8 @@ Find: `{"deviceId":1}` →
 Stop: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa"}`.
 Event: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","status":"RINGING"}`. Allowed device statuses: RINGING, STOPPED, FAILED. Terminal requests cannot return to an active state. Timeout is server-configurable and clamped to 10–300 seconds. Missing/invalid push tokens and exhausted push retries leave the request available to HTTP polling until expiry. GET /pda/commands authenticates X-Device-Id and X-Device-Secret and returns unexpired commands for that device only; see [polling](15-finder-polling.md). An offline device can remain SENT without RINGING and then expire.
 
+`GET /pda/fcm-health` uses `X-Device-Id` and `X-Device-Secret` and returns `{"fallbackRequired":false,"reason":"READY"}` with `Cache-Control: no-store`. Other reasons are `FCM_DISABLED`, `NO_TOKEN`, and `PUSH_FAILED`. State is scoped to the authenticated device/store; READY means no known transport failure, not proof of delivery. Android checks health every 15 seconds and fetches `/pda/commands` only when a local or backend FCM failure is known.
+
 ## Products and image publication
 
 `GET /products/barcode/8850000000012` →

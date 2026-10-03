@@ -3,7 +3,7 @@ package com.company.pda.presentation.rest.product;
 import com.company.pda.application.product.dto.ProductResult;
 import com.company.pda.application.product.usecase.ProductUseCase;
 import com.company.pda.presentation.rest.product.dto.ImageSyncRequest;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 

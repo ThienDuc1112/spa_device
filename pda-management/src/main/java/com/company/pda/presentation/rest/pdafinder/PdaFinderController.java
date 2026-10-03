@@ -5,8 +5,8 @@ import com.company.pda.presentation.rest.pdafinder.dto.FindPdaRequest;
 import com.company.pda.presentation.rest.pdafinder.dto.FindPdaResponse;
 import com.company.pda.presentation.rest.pdafinder.dto.PdaAlertEventRequest;
 import com.company.pda.presentation.rest.pdafinder.dto.StopPdaRequest;
-import jakarta.validation.Valid;
 import java.util.UUID;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 

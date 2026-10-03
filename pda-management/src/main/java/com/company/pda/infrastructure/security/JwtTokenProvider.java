@@ -21,7 +21,8 @@ public class JwtTokenProvider implements TokenProvider {
       JwtEncoder encoder, SecretKeySpec key, @Value("${app.issuer}") String issuer) {
     this.encoder = encoder;
     this.issuer = issuer;
-    var decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+    lombok.val decoder =
+        NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
     decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
     refreshDecoder = decoder;
   }
@@ -31,7 +32,7 @@ public class JwtTokenProvider implements TokenProvider {
         JwtClaimsSet.builder()
             .issuer(issuer)
             .subject("" + user.id())
-            .audience(List.of("retail-api"))
+            .audience(java.util.Arrays.asList("retail-api"))
             .issuedAt(now)
             .expiresAt(now.plusSeconds(900))
             .claim("type", "access")
@@ -45,7 +46,7 @@ public class JwtTokenProvider implements TokenProvider {
         JwtClaimsSet.builder()
             .issuer(issuer)
             .subject("" + user.id())
-            .audience(List.of("retail-refresh"))
+            .audience(java.util.Arrays.asList("retail-refresh"))
             .id(id.toString())
             .issuedAt(now)
             .expiresAt(now.plus(Duration.ofDays(14)))
@@ -55,7 +56,7 @@ public class JwtTokenProvider implements TokenProvider {
 
   public UUID verifyRefresh(String token) {
     try {
-      var jwt = refreshDecoder.decode(token);
+      lombok.val jwt = refreshDecoder.decode(token);
       if (!"refresh".equals(jwt.getClaimAsString("type"))
           || !jwt.getAudience().contains("retail-refresh"))
         throw new DomainException(401, "Invalid refresh token");

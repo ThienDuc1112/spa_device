@@ -42,6 +42,8 @@ Manual dependency injection lives in `di/AppModule`; no Hilt/Dagger setup is req
 
 Use JDK 21 and Android SDK 35. Set `ANDROID_HOME` or an untracked `local.properties`.
 
+The app keeps Activity at 1.10.1, Lifecycle at 2.8.7, and Compose BOM at 2025.03.00 to match `compileSdk 35` and AGP 8.9.1. App and instrumentation dependencies use the same Compose BOM. Updating these families independently can pull transitive AARs that require a newer SDK or AGP. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app. See the [Compose BOM documentation](https://developer.android.com/develop/ui/compose/bom).
+
 ~~~sh
 ./gradlew :app:assembleDebug :app:assembleRelease
 ./gradlew :app:testDebugUnitTest :scanner-factory:testDebugUnitTest :device-android:testDebugUnitTest :app:lintDebug

@@ -27,7 +27,7 @@ flowchart LR
     Target -->|Trạng thái và thông tin xác thực thiết bị| Backend
 ```
 
-Các công nghệ chính: Java 21, Spring Boot 3.5.6, Spring Security, MyBatis, PostgreSQL, Flyway, Firebase Admin SDK, MapStruct và Maven. Phiên bản dependency được quản lý trong [pom.xml](pom.xml).
+Các công nghệ chính: Java 8, Spring Boot 2.7.0, Spring Security, MyBatis, PostgreSQL, Flyway, Firebase Admin SDK, MapStruct và Maven. Phiên bản dependency được quản lý trong [pom.xml](pom.xml).
 
 ## 2. Cách tổ chức thư mục
 
@@ -369,7 +369,7 @@ Thay đổi schema mới cho lịch sử sáu migration dùng V7 trở đi; khô
 
 ### Chạy bằng Maven hoặc JAR
 
-Cài JDK 21 và Maven; chuẩn bị PostgreSQL và cấu hình các biến môi trường cần thiết cho tiến trình Java. Từ thư mục `pda-management`:
+Cài JDK 8 và Maven; chuẩn bị PostgreSQL và cấu hình các biến môi trường cần thiết cho tiến trình Java. Từ thư mục `pda-management`:
 
 ```powershell
 # Kiểm tra build và chạy test hiện có
@@ -379,7 +379,7 @@ mvn verify
 mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
 
 # Hoặc chạy JAR đã build
-java -jar target/pda-management-1.0.0.jar --spring.profiles.active=dev
+java -jar target/pda-management-1.0.0.war --spring.profiles.active=dev
 ```
 
 Khi chạy Maven/Java trực tiếp, file `.env` không tự được nạp bởi cấu hình hiện tại. Cần đặt biến môi trường qua terminal, IDE hoặc cơ chế triển khai. Muốn thử gửi tìm PDA trong profile `dev`, bật cả FCM và scheduler, đồng thời cung cấp credentials hợp lệ.

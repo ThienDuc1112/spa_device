@@ -34,16 +34,16 @@ public class OutboxProcessor {
 
   @Transactional
   public void processOne() throws Exception {
-    var event = ops.next();
+    lombok.val event = ops.next();
     if (event == null) return;
-    var request =
+    lombok.val request =
         finder.find(
             UUID.fromString(event.aggregateId()),
             json.readTree(event.payload()).get("storeId").asLong());
     if (request == null
         || (!event.eventType().equals("STOP")
             && (!request.expiresAt().isAfter(Instant.now())
-                || java.util.Set.of(
+                || java.util.Arrays.asList(
                         PdaFindStatus.STOPPED.name(),
                         PdaFindStatus.EXPIRED.name(),
                         PdaFindStatus.FAILED.name())
@@ -51,7 +51,7 @@ public class OutboxProcessor {
       ops.done(event.id());
       return;
     }
-    var device = devices.find(request.deviceId(), request.storeId());
+    lombok.val device = devices.find(request.deviceId(), request.storeId());
     if (device == null || device.fcmToken() == null) {
       finder.log(request.id(), request.deviceId(), "NO_TOKEN", null);
       ops.done(event.id());
@@ -77,7 +77,7 @@ public class OutboxProcessor {
 
   @Transactional
   public void expire() {
-    for (var r : finder.expired()) {
+    for (lombok.val r : finder.expired()) {
       finder.status(r.id(), PdaFindStatus.EXPIRED.name());
       finder.log(
           r.id(), r.deviceId(), PdaFindStatus.EXPIRED.name(), "No completion before deadline");

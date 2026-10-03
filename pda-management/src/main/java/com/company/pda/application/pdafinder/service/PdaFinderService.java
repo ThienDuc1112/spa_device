@@ -50,12 +50,22 @@ public class PdaFinderService implements FinderUseCase {
 
   @Transactional
   public FindPdaResult find(FindPdaCommand command) {
-    var a = actor.get();
+    lombok.val a = actor.get();
     long deviceId = command.deviceId();
-    var d = devices.find(deviceId, a.storeId());
+    lombok.val d = devices.find(deviceId, a.storeId());
     if (d == null) throw new DeviceNotInStoreException();
+    // A disabled or delayed scheduler must not leave this device blocked indefinitely.
+    for (lombok.val expired : repo.expireForDevice(deviceId, a.storeId())) {
+      repo.log(
+          expired.id(), deviceId, PdaFindStatus.EXPIRED.name(), "No completion before deadline");
+    }
     UUID id = UUID.randomUUID();
-    repo.create(id, a.id(), a.storeId(), deviceId, Instant.now().plusSeconds(timeout));
+    if (repo.create(id, a.id(), a.storeId(), deviceId, Instant.now().plusSeconds(timeout)) == 0) {
+      throw new DomainException(
+          409,
+          "This PDA already has an active finder request. Stop the current alarm or wait for it to"
+              + " expire.");
+    }
     repo.log(id, deviceId, PdaFindStatus.QUEUED.name(), null);
     ops.enqueue("FIND", id.toString(), "{\"storeId\":" + a.storeId() + "}");
     ops.audit(a.id(), a.storeId(), "PDA_FIND", id.toString());
@@ -67,7 +77,7 @@ public class PdaFinderService implements FinderUseCase {
   }
 
   public FcmHealthResult fcmHealth(long deviceId, String secret) {
-    var device = identity.authenticate(deviceId, secret);
+    lombok.val device = identity.authenticate(deviceId, secret);
     if (!fcmEnabled) return new FcmHealthResult(true, "FCM_DISABLED");
     if (device.fcmToken() == null) return new FcmHealthResult(true, "NO_TOKEN");
     String last = repo.lastPushEvent(deviceId, device.storeId());
@@ -78,23 +88,23 @@ public class PdaFinderService implements FinderUseCase {
 
   public java.util.List<com.company.pda.application.pdafinder.dto.DeviceFinderCommand> commands(
       long deviceId, String secret) {
-    var device = identity.authenticate(deviceId, secret);
+    lombok.val device = identity.authenticate(deviceId, secret);
     return repo.commands(deviceId, device.storeId()).stream()
         .map(
             r ->
                 new com.company.pda.application.pdafinder.dto.DeviceFinderCommand(
                     r.id(),
-                    java.util.Set.of("QUEUED", "SENT", "RINGING").contains(r.status())
+                    java.util.Arrays.asList("QUEUED", "SENT", "RINGING").contains(r.status())
                         ? "FIND"
                         : "STOP",
                     r.expiresAt()))
-        .toList();
+        .collect(java.util.stream.Collectors.toList());
   }
 
   @Transactional
   public void stop(UUID id) {
-    var a = actor.get();
-    var r = found(repo.find(id, a.storeId()));
+    lombok.val a = actor.get();
+    lombok.val r = found(repo.find(id, a.storeId()));
     if (repo.status(id, PdaFindStatus.STOPPED.name()) == 1) {
       repo.log(id, r.deviceId(), "STOP_REQUESTED", null);
       ops.enqueue("STOP", id.toString(), "{\"storeId\":" + a.storeId() + "}");
@@ -104,8 +114,8 @@ public class PdaFinderService implements FinderUseCase {
 
   @Transactional
   public void event(long deviceId, String secret, PdaAlertEventCommand body) {
-    var d = identity.authenticate(deviceId, secret);
-    var r = found(repo.find(body.requestId(), d.storeId()));
+    lombok.val d = identity.authenticate(deviceId, secret);
+    lombok.val r = found(repo.find(body.requestId(), d.storeId()));
     if (r.deviceId() != deviceId) throw new DomainException(403, "Wrong target device");
     String status = body.status();
     if (status.equals(PdaFindStatus.RINGING.name()) && !r.expiresAt().isAfter(Instant.now()))

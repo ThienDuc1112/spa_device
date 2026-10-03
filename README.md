@@ -4,7 +4,7 @@ Spring Boot REST API for authentication, device registration, PDA finder notific
 
 ## Technology
 
-Java 21, Spring Boot 3, Spring Security OAuth2 resource server, MyBatis, PostgreSQL, Flyway and Firebase Cloud Messaging.
+Java 8, Spring Boot 2.7.0, Spring Security OAuth2 resource server, MyBatis, PostgreSQL, Flyway and Firebase Cloud Messaging.
 
 ## Build
 
@@ -12,7 +12,7 @@ Java 21, Spring Boot 3, Spring Security OAuth2 resource server, MyBatis, Postgre
 mvn -f pda-management/pom.xml verify
 ```
 
-Set `JAVA_HOME` to JDK 21. `pda-management/.env.example` documents the backend variables used by Docker Compose. The initial administrator is created only when bootstrap is explicitly enabled and a suitable password is supplied.
+Set `JAVA_HOME` to JDK 8 for the backend; Android Gradle builds still use JDK 21. `pda-management/.env.example` documents the backend variables used by Docker Compose. The initial administrator is created only when bootstrap is explicitly enabled and a suitable password is supplied.
 
 ## Run with Docker Compose
 

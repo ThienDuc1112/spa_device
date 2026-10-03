@@ -34,8 +34,8 @@ public class ProductService implements ProductUseCase {
 
   @Transactional
   public void sync(ImageSyncCommand body) {
-    var a = actor.get();
-    var p = found(repo.code(body.productCode()));
+    lombok.val a = actor.get();
+    lombok.val p = found(repo.code(body.productCode()));
     int changed = repo.image(p.id(), body.imageUrl(), body.sourceVersion());
     repo.imageLog(
         p.id(), body.imageUrl(), body.sourceVersion(), changed == 1 ? "APPLIED" : "STALE", a.id());

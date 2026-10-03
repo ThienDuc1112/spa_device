@@ -1,10 +1,27 @@
 package com.company.pda.presentation.rest.pdafinder.dto;
 
 import com.company.pda.application.pdafinder.dto.StopPdaCommand;
-import jakarta.validation.constraints.*;
 import java.util.*;
+import javax.validation.constraints.*;
 
-public record StopPdaRequest(@NotNull UUID requestId) {
+@lombok.EqualsAndHashCode
+@lombok.ToString
+public final class StopPdaRequest {
+  private final @NotNull UUID requestId;
+
+  @java.beans.ConstructorProperties({"requestId"})
+  public StopPdaRequest(UUID requestId) {
+    this.requestId = requestId;
+  }
+
+  public UUID requestId() {
+    return requestId;
+  }
+
+  public UUID getRequestId() {
+    return requestId;
+  }
+
   public StopPdaCommand toCommand() {
     return new StopPdaCommand(requestId);
   }

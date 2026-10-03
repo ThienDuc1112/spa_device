@@ -15,8 +15,15 @@
   <select id="find" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity">
     SELECT id,requester_id,store_id,device_id,status,expires_at FROM pda_find_requests WHERE id=#{id} AND store_id=#{storeId}
   </select>
+  <select id="expireForDevice" resultType="com.company.pda.infrastructure.persistence.mybatis.entity.PdaFindRequestEntity" affectData="true" flushCache="true" useCache="false">
+    UPDATE pda_find_requests SET status='EXPIRED',updated_at=now()
+    WHERE device_id=#{deviceId} AND store_id=#{storeId} AND expires_at&lt;=now()
+      AND status IN ('QUEUED','SENT','RINGING')
+    RETURNING id,requester_id,store_id,device_id,status,expires_at
+  </select>
   <insert id="create">
     INSERT INTO pda_find_requests(id,requester_id,store_id,device_id,status,expires_at) VALUES(#{id},#{actorId},#{storeId},#{deviceId},'QUEUED',#{expiresAt})
+    ON CONFLICT (device_id) WHERE status IN ('QUEUED','SENT','RINGING') DO NOTHING
   </insert>
   <update id="status">
     UPDATE pda_find_requests SET status=#{status},updated_at=now() WHERE id=#{id} AND status IN ('QUEUED','SENT','RINGING')

@@ -2,10 +2,12 @@
 
 ## Build and verify
 
-Prerequisites: JDK 21 and Maven 3.9+, Android SDK 35 and an installed/licensed SDK toolchain. The Gradle 8.11.1 wrapper is included. Backend integration tests start an isolated real PostgreSQL 14 instance using [Zonky Embedded Postgres](https://github.com/zonkyio/embedded-postgres), including on Windows; no Docker daemon is required for the test suite. Run tests as a non-root user on Linux. The application deployment uses PostgreSQL 16.
+Prerequisites: JDK 8 and Maven 3.9+ for the backend; JDK 21 for Android, Android SDK 35 and an installed/licensed SDK toolchain. The Gradle 8.11.1 wrapper is included. Backend integration tests start an isolated real PostgreSQL 14 instance using [Zonky Embedded Postgres](https://github.com/zonkyio/embedded-postgres), including on Windows; no Docker daemon is required for the test suite. Run tests as a non-root user on Linux. The application deployment uses PostgreSQL 16.
 
 ```sh
+# JAVA_HOME must point to JDK 8 for Maven
 mvn -f pda-management/pom.xml verify
+# Switch JAVA_HOME to JDK 21 for Gradle
 cd pda-android
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
@@ -16,7 +18,7 @@ Windows: use `gradlew.bat`; set JAVA_HOME to JDK 21 and ANDROID_HOME to your SDK
 ./gradlew assembleDebug -PapiUrl=https://pda.your-company.example/
 ```
 
-Outputs: `pda-management/target/pda-management-1.0.0.jar` and `pda-android/app/build/outputs/apk/debug/app-debug.apk`. Firebase configuration is optional for compilation, so CI does not need secrets. It is required for push functionality. Release APKs need your enterprise signing configuration; no private signing key is committed.
+Outputs: `pda-management/target/pda-management-1.0.0.war` and `pda-android/app/build/outputs/apk/debug/app-debug.apk`. Firebase configuration is optional for compilation, so CI does not need secrets. It is required for push functionality. Release APKs need your enterprise signing configuration; no private signing key is committed.
 
 ## First backend installation
 

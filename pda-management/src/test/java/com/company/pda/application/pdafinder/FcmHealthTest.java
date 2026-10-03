@@ -38,13 +38,13 @@ class FcmHealthTest {
 
   @Test
   void lastObservedSendFailureEnablesFallbackUntilSendSucceeds() {
-    var service = service(true, "token");
+    lombok.val service = service(true, "token");
     assertFalse(service.fcmHealth(1, "secret").fallbackRequired());
-    for (String event : java.util.List.of("RETRY", "INVALID_TOKEN", "NO_TOKEN")) {
+    for (String event : java.util.Arrays.asList("RETRY", "INVALID_TOKEN", "NO_TOKEN")) {
       when(requests.lastPushEvent(1, 7)).thenReturn(event);
       assertTrue(service.fcmHealth(1, "secret").fallbackRequired());
     }
-    for (String event : java.util.List.of("PUSH_FIND", "PUSH_STOP")) {
+    for (String event : java.util.Arrays.asList("PUSH_FIND", "PUSH_STOP")) {
       when(requests.lastPushEvent(1, 7)).thenReturn(event);
       assertFalse(service.fcmHealth(1, "secret").fallbackRequired());
     }

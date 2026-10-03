@@ -16,12 +16,12 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.*;
 
 @SpringBootTest(
@@ -32,6 +32,14 @@ import org.springframework.test.web.servlet.*;
     })
 @AutoConfigureMockMvc
 class StoreFlowsIT {
+  private static Map<String, Object> mapOf(Object... entries) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    for (int i = 0; i < entries.length; i += 2) {
+      result.put((String) entries[i], entries[i + 1]);
+    }
+    return result;
+  }
+
   static final EmbeddedPostgres POSTGRES = start();
 
   static EmbeddedPostgres start() {
@@ -56,7 +64,7 @@ class StoreFlowsIT {
   @Autowired OutboxProcessor worker;
   @Autowired com.company.pda.domain.pdafinder.repository.PdaFindRepository finderRequests;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
-  @MockitoBean NotificationPort push;
+  @MockBean NotificationPort push;
   String manager, employee, other;
 
   @BeforeEach
@@ -82,7 +90,7 @@ class StoreFlowsIT {
             + " One'),(2,'P2','456','Product Two')");
     db.execute(
         "INSERT INTO inventories(store_id,product_id,quantity) VALUES(1,1,10),(1,2,3),(2,1,20)");
-    for (String table : List.of("users", "stores", "products")) {
+    for (String table : java.util.Arrays.asList("users", "stores", "products")) {
       db.execute(
           "SELECT setval(pg_get_serial_sequence('"
               + table
@@ -103,7 +111,7 @@ class StoreFlowsIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         json.writeValueAsString(
-                            Map.of("username", user, "password", "test-password"))))
+                            mapOf("username", user, "password", "test-password"))))
             .andExpect(status().isOk())
             .andReturn());
   }
@@ -113,16 +121,17 @@ class StoreFlowsIT {
   }
 
   ResultActions postJson(String path, String token, Object content) throws Exception {
-    var request =
+    lombok.val request =
         post(path)
             .contentType(MediaType.APPLICATION_JSON)
             .content(json.writeValueAsString(content));
-    if (!token.isBlank()) request.header("Authorization", "Bearer " + token);
+    if (!token.codePoints().allMatch(Character::isWhitespace))
+      request.header("Authorization", "Bearer " + token);
     return mvc.perform(request);
   }
 
   Map<String, Object> adjustment(UUID id, long version, int quantity) {
-    return Map.of(
+    return mapOf(
         "requestId",
         id,
         "productCode",
@@ -136,15 +145,15 @@ class StoreFlowsIT {
   }
 
   Map<String, Object> disposal(UUID id, int first, int second) {
-    return Map.of(
+    return mapOf(
         "requestId",
         id,
         "remarks",
         "Damaged",
         "items",
-        List.of(
-            Map.of("productCode", "P1", "quantity", first, "reason", "Broken"),
-            Map.of("productCode", "P2", "quantity", second, "reason", "Broken")));
+        java.util.Arrays.asList(
+            mapOf("productCode", "P1", "quantity", first, "reason", "Broken"),
+            mapOf("productCode", "P2", "quantity", second, "reason", "Broken")));
   }
 
   BigDecimal stock() {
@@ -154,24 +163,24 @@ class StoreFlowsIT {
 
   @Test
   void refreshRotatesAndReuseRevokesFamily() throws Exception {
-    var initial = login("user1");
-    var rotated =
+    lombok.val initial = login("user1");
+    lombok.val rotated =
         body(
             postJson(
                     "/auth/refresh",
                     "",
-                    Map.of("refreshToken", initial.get("refreshToken").asText()))
+                    mapOf("refreshToken", initial.get("refreshToken").asText()))
                 .andExpect(status().isOk())
                 .andReturn());
-    postJson("/auth/refresh", "", Map.of("refreshToken", initial.get("refreshToken").asText()))
+    postJson("/auth/refresh", "", mapOf("refreshToken", initial.get("refreshToken").asText()))
         .andExpect(status().isUnauthorized());
-    postJson("/auth/refresh", "", Map.of("refreshToken", rotated.get("refreshToken").asText()))
+    postJson("/auth/refresh", "", mapOf("refreshToken", rotated.get("refreshToken").asText()))
         .andExpect(status().isUnauthorized());
   }
 
   @Test
   void refreshTokenCannotAccessApi() throws Exception {
-    var tokens = login("user1");
+    lombok.val tokens = login("user1");
     mvc.perform(
             get("/products/barcode/123")
                 .header("Authorization", "Bearer " + tokens.get("refreshToken").asText()))
@@ -194,7 +203,7 @@ class StoreFlowsIT {
     postJson("/disposals", manager, disposal(id, 1, 1)).andExpect(status().isOk());
     mvc.perform(get("/disposals/" + id).header("Authorization", "Bearer " + other))
         .andExpect(status().isNotFound());
-    postJson("/disposals/" + id + "/confirm", other, Map.of("version", 0))
+    postJson("/disposals/" + id + "/confirm", other, mapOf("version", 0))
         .andExpect(status().isNotFound());
   }
 
@@ -216,7 +225,7 @@ class StoreFlowsIT {
   void disposalRollsBackAllItemsOnInsufficientStock() throws Exception {
     UUID id = UUID.randomUUID();
     postJson("/disposals", manager, disposal(id, 2, 4)).andExpect(status().isOk());
-    postJson("/disposals/" + id + "/confirm", manager, Map.of("version", 0))
+    postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 0))
         .andExpect(status().isConflict());
     assertEquals(new BigDecimal("10.00"), stock());
     assertEquals(
@@ -228,12 +237,12 @@ class StoreFlowsIT {
     UUID id = UUID.randomUUID();
     postJson("/disposals", manager, disposal(id, 2, 1)).andExpect(status().isOk());
     for (int n = 0; n < 2; n++)
-      postJson("/disposals/" + id + "/confirm", manager, Map.of("version", 0))
+      postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 0))
           .andExpect(status().isOk());
     assertEquals(new BigDecimal("8.00"), stock());
     assertEquals(
         2, db.queryForObject("SELECT count(*) FROM inventory_transactions", Integer.class));
-    postJson("/disposals/" + id + "/cancel", manager, Map.of("version", 1))
+    postJson("/disposals/" + id + "/cancel", manager, mapOf("version", 1))
         .andExpect(status().isConflict());
   }
 
@@ -241,9 +250,9 @@ class StoreFlowsIT {
   void cancelDoesNotDeductAndCannotConfirmCancelled() throws Exception {
     UUID id = UUID.randomUUID();
     postJson("/disposals", manager, disposal(id, 2, 1)).andExpect(status().isOk());
-    postJson("/disposals/" + id + "/cancel", manager, Map.of("version", 0))
+    postJson("/disposals/" + id + "/cancel", manager, mapOf("version", 0))
         .andExpect(status().isOk());
-    postJson("/disposals/" + id + "/confirm", manager, Map.of("version", 1))
+    postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 1))
         .andExpect(status().isConflict());
     assertEquals(new BigDecimal("10.00"), stock());
   }
@@ -252,7 +261,7 @@ class StoreFlowsIT {
   void rejectsNegativeAndOverPrecisionQuantities() throws Exception {
     postJson("/inventory-adjustments", manager, adjustment(UUID.randomUUID(), 0, -1))
         .andExpect(status().isBadRequest());
-    var b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 1));
+    lombok.val b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 1));
     b.put("quantity", new BigDecimal("1.001"));
     postJson("/inventory-adjustments", manager, b).andExpect(status().isBadRequest());
   }
@@ -262,14 +271,14 @@ class StoreFlowsIT {
         postJson(
                 "/devices/register",
                 manager,
-                Map.of("deviceCode", "PDA1", "deviceName", "Device One", "fcmToken", "test-token"))
+                mapOf("deviceCode", "PDA1", "deviceName", "Device One", "fcmToken", "test-token"))
             .andExpect(status().isOk())
             .andReturn());
   }
 
   @Test
   void fcmHealthAuthenticatesDeviceAndTracksLatestPushResultOnly() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
     mvc.perform(get("/pda/fcm-health").header("X-Device-Id", id).header("X-Device-Secret", "wrong"))
@@ -279,12 +288,12 @@ class StoreFlowsIT {
         .andExpect(header().string("Cache-Control", "no-store"))
         .andExpect(jsonPath("fallbackRequired").value(true))
         .andExpect(jsonPath("reason").value("FCM_DISABLED"));
-    var request =
+    lombok.val request =
         body(
-            postJson("/pda/find", manager, Map.of("deviceId", id))
+            postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
-    var requestId = UUID.fromString(request.get("id").asText());
+    lombok.val requestId = UUID.fromString(request.get("id").asText());
     assertNull(finderRequests.lastPushEvent(id, 1));
     doThrow(new IllegalStateException("FCM unavailable"))
         .when(push)
@@ -302,12 +311,12 @@ class StoreFlowsIT {
 
   @Test
   void finderPersistsPushAndInvalidTokenIsRemoved() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
-    postJson("/pda/find", other, Map.of("deviceId", id)).andExpect(status().isNotFound());
-    var request =
+    postJson("/pda/find", other, mapOf("deviceId", id)).andExpect(status().isNotFound());
+    lombok.val request =
         body(
-            postJson("/pda/find", manager, Map.of("deviceId", id))
+            postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
     doThrow(new NotificationPort.InvalidToken()).when(push).send(any(), any(), any(), any());
@@ -323,12 +332,12 @@ class StoreFlowsIT {
 
   @Test
   void pollingSurvivesPushFailureAndDeliversStopWithDeviceIsolation() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
-    var request =
+    lombok.val request =
         body(
-            postJson("/pda/find", manager, Map.of("deviceId", id))
+            postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
     String requestId = request.get("id").asText();
@@ -343,12 +352,12 @@ class StoreFlowsIT {
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].requestId").value(requestId))
         .andExpect(jsonPath("$[0].command").value("FIND"));
-    var another =
+    lombok.val another =
         body(
             postJson(
                     "/devices/register",
                     other,
-                    Map.of("deviceCode", "PDA2", "deviceName", "Other store PDA"))
+                    mapOf("deviceCode", "PDA2", "deviceName", "Other store PDA"))
                 .andExpect(status().isOk())
                 .andReturn());
     mvc.perform(
@@ -363,11 +372,11 @@ class StoreFlowsIT {
                 .header("X-Device-Secret", secret)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    json.writeValueAsString(Map.of("requestId", requestId, "status", "RINGING"))))
+                    json.writeValueAsString(mapOf("requestId", requestId, "status", "RINGING"))))
         .andExpect(status().isOk());
     assertEquals(
         "RINGING", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
-    postJson("/pda/stop", manager, Map.of("requestId", requestId)).andExpect(status().isOk());
+    postJson("/pda/stop", manager, mapOf("requestId", requestId)).andExpect(status().isOk());
     mvc.perform(get("/pda/commands").header("X-Device-Id", id).header("X-Device-Secret", secret))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].command").value("STOP"));
@@ -376,14 +385,14 @@ class StoreFlowsIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
     // The invalidated push token no longer prevents subsequent HTTP-delivered requests.
-    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+    postJson("/pda/find", manager, mapOf("deviceId", id)).andExpect(status().isOk());
   }
 
   @Test
   void exhaustedPushRetriesLeavePollingAvailableUntilExpiry() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
-    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+    postJson("/pda/find", manager, mapOf("deviceId", id)).andExpect(status().isOk());
     db.update("UPDATE outbox_events SET attempts=7");
     doThrow(new IllegalStateException("FCM disabled")).when(push).send(any(), any(), any(), any());
     worker.processOne();
@@ -403,16 +412,16 @@ class StoreFlowsIT {
 
   @Test
   void deviceWithoutFirebaseCanRegisterAndReceiveCommands() throws Exception {
-    var device =
+    lombok.val device =
         body(
             postJson(
                     "/devices/register",
                     manager,
-                    Map.of("deviceCode", "NOFCM", "deviceName", "Polling PDA"))
+                    mapOf("deviceCode", "NOFCM", "deviceName", "Polling PDA"))
                 .andExpect(status().isOk())
                 .andReturn());
     long id = device.get("deviceId").asLong();
-    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isOk());
+    postJson("/pda/find", manager, mapOf("deviceId", id)).andExpect(status().isOk());
     worker.processOne();
     verifyNoInteractions(push);
     mvc.perform(
@@ -425,11 +434,11 @@ class StoreFlowsIT {
 
   @Test
   void finderAckRequiresDeviceSecretAndExpiredRequestsDoNotSend() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
-    var request =
+    lombok.val request =
         body(
-            postJson("/pda/find", manager, Map.of("deviceId", id))
+            postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
     String requestId = request.get("id").asText();
@@ -439,7 +448,7 @@ class StoreFlowsIT {
                 .header("X-Device-Secret", "wrong")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    json.writeValueAsString(Map.of("requestId", requestId, "status", "RINGING"))))
+                    json.writeValueAsString(mapOf("requestId", requestId, "status", "RINGING"))))
         .andExpect(status().isUnauthorized());
     db.update("UPDATE pda_find_requests SET expires_at=now()-interval '1 second'");
     worker.expire();
@@ -453,25 +462,41 @@ class StoreFlowsIT {
   void concurrentConfirmationsDeductExactlyOnce() throws Exception {
     UUID id = UUID.randomUUID();
     postJson("/disposals", manager, disposal(id, 2, 1)).andExpect(status().isOk());
-    try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-      var task =
+    java.util.concurrent.ExecutorService pool =
+        java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      lombok.val task =
           (java.util.concurrent.Callable<Integer>)
               () ->
-                  postJson("/disposals/" + id + "/confirm", manager, Map.of("version", 0))
+                  postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 0))
                       .andReturn()
                       .getResponse()
                       .getStatus();
-      var first = pool.submit(task);
-      var second = pool.submit(task);
+      lombok.val first = pool.submit(task);
+      lombok.val second = pool.submit(task);
       assertEquals(200, first.get());
       assertEquals(200, second.get());
+    } finally {
+      pool.shutdownNow();
     }
     assertEquals(new BigDecimal("8.00"), stock());
   }
 
   @Test
+  void validationErrorsKeepProblemJsonContract() throws Exception {
+    postJson("/auth/login", "", mapOf("username", "", "password", ""))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.title").value("Bad Request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("Invalid request fields"))
+        .andExpect(jsonPath("$.instance").value("/auth/login"));
+  }
+
+  @Test
   void successfulFinderAndTokenRefresh() throws Exception {
-    var device = register();
+    lombok.val device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
     mvc.perform(
@@ -481,13 +506,19 @@ class StoreFlowsIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fcmToken\":\"rotated-token\"}"))
         .andExpect(status().isOk());
-    var request =
+    lombok.val request =
         body(
-            postJson("/pda/find", manager, Map.of("deviceId", id))
+            postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
     String requestId = request.get("id").asText();
-    postJson("/pda/find", manager, Map.of("deviceId", id)).andExpect(status().isConflict());
+    postJson("/pda/find", manager, mapOf("deviceId", id))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.detail")
+                .value(
+                    "This PDA already has an active finder request. Stop the current alarm or wait"
+                        + " for it to expire."));
     worker.processOne();
     verify(push).send(eq("rotated-token"), eq("FIND"), eq(UUID.fromString(requestId)), any());
     mvc.perform(
@@ -496,11 +527,11 @@ class StoreFlowsIT {
                 .header("X-Device-Secret", secret)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    json.writeValueAsString(Map.of("requestId", requestId, "status", "RINGING"))))
+                    json.writeValueAsString(mapOf("requestId", requestId, "status", "RINGING"))))
         .andExpect(status().isOk());
     assertEquals(
         "RINGING", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
-    postJson("/pda/stop", manager, Map.of("requestId", requestId)).andExpect(status().isOk());
+    postJson("/pda/stop", manager, mapOf("requestId", requestId)).andExpect(status().isOk());
     worker.processOne();
     verify(push).send(eq("rotated-token"), eq("STOP"), eq(UUID.fromString(requestId)), any());
     mvc.perform(
@@ -509,16 +540,96 @@ class StoreFlowsIT {
                 .header("X-Device-Secret", secret)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    json.writeValueAsString(Map.of("requestId", requestId, "status", "RINGING"))))
+                    json.writeValueAsString(mapOf("requestId", requestId, "status", "RINGING"))))
         .andExpect(status().isOk());
     assertEquals(
         "STOPPED", db.queryForObject("SELECT status FROM pda_find_requests", String.class));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"QUEUED", "SENT", "RINGING"})
+  void expiredFinderDoesNotBlockNewSearchWhenSchedulerIsDisabled(String oldStatus)
+      throws Exception {
+    long deviceId = register().get("deviceId").asLong();
+    UUID oldId =
+        UUID.fromString(
+            body(postJson("/pda/find", manager, mapOf("deviceId", deviceId))
+                    .andExpect(status().isOk())
+                    .andReturn())
+                .get("id")
+                .asText());
+    db.update(
+        "UPDATE pda_find_requests SET status=?, expires_at=now()-interval '1 second' WHERE id=?",
+        oldStatus,
+        oldId);
+
+    postJson("/pda/find", other, mapOf("deviceId", deviceId)).andExpect(status().isNotFound());
+    assertEquals(
+        oldStatus,
+        db.queryForObject("SELECT status FROM pda_find_requests WHERE id=?", String.class, oldId));
+
+    JsonNode next =
+        body(
+            postJson("/pda/find", manager, mapOf("deviceId", deviceId))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertNotEquals(oldId.toString(), next.get("id").asText());
+    assertEquals("QUEUED", next.get("status").asText());
+    assertEquals(
+        "EXPIRED",
+        db.queryForObject("SELECT status FROM pda_find_requests WHERE id=?", String.class, oldId));
+    assertEquals(
+        1,
+        db.queryForObject(
+            "SELECT count(*) FROM pda_alert_logs WHERE request_id=? AND event='EXPIRED'",
+            Integer.class,
+            oldId));
+    // An old outbox entry must not send a stale FIND after the new request is created.
+    worker.processOne();
+    verifyNoInteractions(push);
+  }
+
+  @Test
+  void concurrentFindsCreateOnlyOneRequestAndReturnClearConflict() throws Exception {
+    long deviceId = register().get("deviceId").asLong();
+    java.util.concurrent.ExecutorService pool =
+        java.util.concurrent.Executors.newFixedThreadPool(2);
+    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+    try {
+      java.util.concurrent.Callable<Integer> find =
+          () -> {
+            start.await();
+            return postJson("/pda/find", manager, mapOf("deviceId", deviceId))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+          };
+      java.util.concurrent.Future<Integer> first = pool.submit(find);
+      java.util.concurrent.Future<Integer> second = pool.submit(find);
+      start.countDown();
+      List<Integer> statuses =
+          Arrays.asList(
+              first.get(15, java.util.concurrent.TimeUnit.SECONDS),
+              second.get(15, java.util.concurrent.TimeUnit.SECONDS));
+      Collections.sort(statuses);
+      assertEquals(Arrays.asList(200, 409), statuses);
+      assertEquals(
+          1,
+          db.queryForObject(
+              "SELECT count(*) FROM pda_find_requests WHERE device_id=?", Integer.class, deviceId));
+      assertEquals(
+          1,
+          db.queryForObject(
+              "SELECT count(*) FROM outbox_events WHERE event_type='FIND'", Integer.class));
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
   @Test
   void transientPushFailureRemainsRetryable() throws Exception {
-    var device = register();
-    postJson("/pda/find", manager, Map.of("deviceId", device.get("deviceId").asLong()))
+    lombok.val device = register();
+    postJson("/pda/find", manager, mapOf("deviceId", device.get("deviceId").asLong()))
         .andExpect(status().isOk());
     doThrow(new IllegalStateException("Unavailable")).when(push).send(any(), any(), any(), any());
     worker.processOne();
@@ -538,7 +649,7 @@ class StoreFlowsIT {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(
                       json.writeValueAsString(
-                          Map.of(
+                          mapOf(
                               "productCode",
                               "P1",
                               "imageUrl",
@@ -567,19 +678,19 @@ class StoreFlowsIT {
 
   @Test
   void missingVersionCannotOverwriteVersionZero() throws Exception {
-    var b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 5));
+    lombok.val b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 5));
     b.remove("version");
     postJson("/inventory-adjustments", manager, b).andExpect(status().isBadRequest());
   }
 
   @Test
   void managerRegistersEmployeeWhoCanLogIn() throws Exception {
-    var response =
+    lombok.val response =
         body(
             postJson(
                     "/auth/register",
                     manager,
-                    Map.of(
+                    mapOf(
                         "username",
                         "new.employee",
                         "password",
@@ -613,8 +724,8 @@ class StoreFlowsIT {
 
   @Test
   void registrationRequiresManagerAndCannotChooseRoleOrStore() throws Exception {
-    var command =
-        Map.of(
+    lombok.val command =
+        mapOf(
             "username",
             "scoped.employee",
             "password",
@@ -627,13 +738,13 @@ class StoreFlowsIT {
             "MANAGER");
     postJson("/auth/register", "", command).andExpect(status().isUnauthorized());
     postJson("/auth/register", employee, command).andExpect(status().isForbidden());
-    var response =
+    lombok.val response =
         body(
             postJson("/auth/register", other, command).andExpect(status().isCreated()).andReturn());
     assertEquals(2, response.get("storeId").asLong());
     assertEquals("EMPLOYEE", response.get("role").asText());
     assertEquals(
-        List.of("EMPLOYEE"),
+        java.util.Arrays.asList("EMPLOYEE"),
         db.queryForList(
             "SELECT r.role_name FROM user_roles ur JOIN roles r ON ur.role_id=r.id WHERE"
                 + " ur.user_id=?",
@@ -646,19 +757,20 @@ class StoreFlowsIT {
     postJson(
             "/auth/register",
             manager,
-            Map.of("username", "user1", "password", "test-password", "fullName", "Duplicate"))
+            mapOf("username", "user1", "password", "test-password", "fullName", "Duplicate"))
         .andExpect(status().isConflict());
-    for (String password : List.of("short", "\u00e9".repeat(40))) {
+    for (String password :
+        java.util.Arrays.asList("short", String.join("", Collections.nCopies(40, "\u00e9")))) {
       postJson(
               "/auth/register",
               manager,
-              Map.of("username", "bad.employee", "password", password, "fullName", "Invalid"))
+              mapOf("username", "bad.employee", "password", password, "fullName", "Invalid"))
           .andExpect(status().isBadRequest());
     }
     postJson(
             "/auth/register",
             manager,
-            Map.of(
+            mapOf(
                 "username",
                 "bad username",
                 "password",
@@ -673,8 +785,8 @@ class StoreFlowsIT {
 
   @Test
   void developmentSeedIsRepeatableAndPreservesChangedData() throws Exception {
-    var seeder = new DevelopmentDataSeeder(db, passwords, "test-password");
-    var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+    lombok.val seeder = new DevelopmentDataSeeder(db, passwords, "test-password");
+    lombok.val tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
     tx.executeWithoutResult(s -> seeder.run());
     long storeId =
         db.queryForObject("SELECT id FROM stores WHERE store_code='DEMO-001'", Long.class);

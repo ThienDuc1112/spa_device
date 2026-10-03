@@ -26,7 +26,9 @@ public class MyBatisDeviceRepository implements DeviceRepository {
 
   @Override
   public java.util.List<Device> list(long storeId) {
-    return mapper.list(storeId).stream().map(DeviceEntityMapper::toDomain).toList();
+    return mapper.list(storeId).stream()
+        .map(DeviceEntityMapper::toDomain)
+        .collect(java.util.stream.Collectors.toList());
   }
 
   @Override

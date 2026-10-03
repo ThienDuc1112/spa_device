@@ -13,6 +13,9 @@ public interface PdaFindMapper {
 
   PdaFindRequestEntity find(@Param("id") UUID id, @Param("storeId") long storeId);
 
+  java.util.List<PdaFindRequestEntity> expireForDevice(
+      @Param("deviceId") long deviceId, @Param("storeId") long storeId);
+
   int create(
       @Param("id") UUID id,
       @Param("actorId") long actorId,

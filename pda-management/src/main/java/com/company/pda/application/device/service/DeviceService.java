@@ -29,12 +29,14 @@ public class DeviceService implements DeviceUseCase {
   }
 
   public java.util.List<DeviceResult> list() {
-    return repo.list(actor.get().storeId()).stream().map(DeviceResult::from).toList();
+    return repo.list(actor.get().storeId()).stream()
+        .map(DeviceResult::from)
+        .collect(java.util.stream.Collectors.toList());
   }
 
   @Transactional
   public DeviceRegistrationResult register(RegisterDeviceCommand body) {
-    var a = actor.get();
+    lombok.val a = actor.get();
     byte[] bytes = new byte[32];
     new SecureRandom().nextBytes(bytes);
     String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -51,7 +53,7 @@ public class DeviceService implements DeviceUseCase {
   }
 
   public Device authenticate(long id, String secret) {
-    var d = repo.identity(id);
+    lombok.val d = repo.identity(id);
     if (d == null
         || secret == null
         || !MessageDigest.isEqual(
@@ -63,7 +65,7 @@ public class DeviceService implements DeviceUseCase {
 
   @Transactional
   public void token(long id, String secret, UpdateFcmTokenCommand body) {
-    var d = authenticate(id, secret);
+    lombok.val d = authenticate(id, secret);
     repo.token(id, body.fcmToken());
     ops.systemAudit(d.storeId(), "DEVICE_TOKEN_REFRESH", Long.toString(id));
   }

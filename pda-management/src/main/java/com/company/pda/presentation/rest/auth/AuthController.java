@@ -7,7 +7,7 @@ import com.company.pda.presentation.rest.auth.dto.LoginResponse;
 import com.company.pda.presentation.rest.auth.dto.RefreshTokenRequest;
 import com.company.pda.presentation.rest.auth.dto.RegisterUserRequest;
 import com.company.pda.presentation.rest.auth.dto.RegisterUserResponse;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;

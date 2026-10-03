@@ -1,3 +1,20 @@
 package com.company.pda.application.device.dto;
 
-public record UpdateFcmTokenCommand(String fcmToken) {}
+@lombok.EqualsAndHashCode
+@lombok.ToString
+public final class UpdateFcmTokenCommand {
+  private final String fcmToken;
+
+  @java.beans.ConstructorProperties({"fcmToken"})
+  public UpdateFcmTokenCommand(String fcmToken) {
+    this.fcmToken = fcmToken;
+  }
+
+  public String fcmToken() {
+    return fcmToken;
+  }
+
+  public String getFcmToken() {
+    return fcmToken;
+  }
+}

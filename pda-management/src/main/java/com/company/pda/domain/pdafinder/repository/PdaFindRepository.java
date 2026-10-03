@@ -11,6 +11,8 @@ public interface PdaFindRepository {
 
   PdaFindRequest find(UUID id, long storeId);
 
+  java.util.List<PdaFindRequest> expireForDevice(long deviceId, long storeId);
+
   int create(UUID id, long actorId, long storeId, long deviceId, Instant expiresAt);
 
   int status(UUID id, String status);
