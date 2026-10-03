@@ -35,6 +35,16 @@ public class DeviceService implements DeviceUseCase {
   }
 
   @Transactional
+  public void deleteFromWeb(long id) {
+    Device device = DomainException.found(repo.lock(id));
+    if (repo.hasActiveFinder(id))
+      throw new DomainException(
+          409, "Stop the active finder request or wait for expiry before deleting this PDA.");
+    repo.delete(id);
+    ops.systemAudit(device.storeId(), "DEVICE_DELETE_WEB", Long.toString(id));
+  }
+
+  @Transactional
   public DeviceRegistrationResult register(RegisterDeviceCommand body) {
     lombok.val a = actor.get();
     byte[] bytes = new byte[32];

@@ -49,9 +49,6 @@ pda-android/
 │       │   │   │   │   └── DisposalUiState.java
 │       │   │   │   │
 │       │   │   │   └── pdafinder/
-│       │   │   │       ├── PdaFinderActivity.java
-│       │   │   │       ├── PdaFinderViewModel.java
-│       │   │   │       └── PdaFinderUiState.java
 │       │   │   │
 │       │   │   ├── domain/
 │       │   │   │   ├── model/

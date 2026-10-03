@@ -5,7 +5,7 @@ spring:
     password: "12345678"
 
 app:
-  scheduler-enabled: false
+  scheduler-enabled: ${APP_SCHEDULER_ENABLED:true}
   seed:
     enabled: true
     password: "DemoPassword123!"

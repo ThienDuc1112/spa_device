@@ -7,7 +7,7 @@ import java.util.UUID;
 @lombok.ToString
 public final class PdaFindRequest {
   private final UUID id;
-  private final long requesterId;
+  private final Long requesterId;
   private final long storeId;
   private final long deviceId;
   private final String status;
@@ -22,7 +22,7 @@ public final class PdaFindRequest {
     "expiresAt"
   })
   public PdaFindRequest(
-      UUID id, long requesterId, long storeId, long deviceId, String status, Instant expiresAt) {
+      UUID id, Long requesterId, long storeId, long deviceId, String status, Instant expiresAt) {
     this.id = id;
     this.requesterId = requesterId;
     this.storeId = storeId;
@@ -39,11 +39,11 @@ public final class PdaFindRequest {
     return id;
   }
 
-  public long requesterId() {
+  public Long requesterId() {
     return requesterId;
   }
 
-  public long getRequesterId() {
+  public Long getRequesterId() {
     return requesterId;
   }
 

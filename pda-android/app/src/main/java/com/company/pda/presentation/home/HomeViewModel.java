@@ -12,6 +12,7 @@ public class HomeViewModel extends AsyncViewModel {
   private final SavedStateHandle saved;
   public final MutableLiveData<String> screen;
   public final MutableLiveData<Integer> revision = new MutableLiveData<>(0);
+  public final MutableLiveData<Boolean> registrationRequired = new MutableLiveData<>(false);
   public final ArrayList<Product> scanned = new ArrayList<>();
   public Product selected;
 
@@ -55,16 +56,75 @@ public class HomeViewModel extends AsyncViewModel {
     return modules.device.registered();
   }
 
+  public void checkRegistration() {
+    if (!loggedIn()) return;
+    if (!registered()) {
+      registrationRequired.setValue(true);
+      return;
+    }
+    String id = modules.tokens.get("deviceId"), secret = modules.tokens.get("deviceSecret");
+    run(
+        "Checking PDA registration…",
+        () -> {
+          try {
+            // Device-authenticated, one check when Home resumes, not command/health polling.
+            com.company.pda.common.util.ApiCalls.execute(
+                modules.finderApi.fcmHealth(Long.parseLong(id), secret));
+            return () -> {
+              clearRetry();
+              status.setValue("PDA registered");
+            };
+          } catch (com.company.pda.common.exception.ApiException e) {
+            if (e.status != 401) throw e;
+            return () -> {
+              clearRetry();
+              if (modules.device.clearRegistration(id, secret)) {
+                getApplication()
+                    .stopService(
+                        new android.content.Intent(
+                            getApplication(),
+                            com.company.pda.infrastructure.firebase.FinderPollingService.class));
+                getApplication()
+                    .stopService(
+                        new android.content.Intent(
+                            getApplication(),
+                            com.company.pda.infrastructure.alarm.PdaAlarmService.class));
+                status.setValue("PDA registration was removed. Register this device again.");
+                registrationRequired.setValue(true);
+              }
+            };
+          }
+        });
+  }
+
   public void register(String code, String name) {
+    if (registered()) return;
+    if (code.trim().isEmpty()
+        || name.trim().isEmpty()
+        || code.trim().length() > 100
+        || name.trim().length() > 255) {
+      error.setValue("Enter an asset code (up to 100 characters) and name (up to 255 characters)");
+      return;
+    }
     run(
         "Registering device…",
         () -> {
-          modules.finder.register(code, name);
+          modules.finder.register(code.trim(), name.trim());
           return () -> {
+            clearRetry();
             modules.fcm.initialize();
             com.company.pda.infrastructure.firebase.FinderPollingService.start(getApplication());
             status.setValue("Device registered");
           };
         });
+  }
+
+  public String suggestedDeviceCode() {
+    String code = modules.tokens.get("registrationCode");
+    if (code == null) {
+      code = "PDA-" + UUID.randomUUID();
+      modules.tokens.put("registrationCode", code);
+    }
+    return code;
   }
 }

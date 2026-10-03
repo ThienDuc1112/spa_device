@@ -51,25 +51,33 @@ public class PdaFinderService implements FinderUseCase {
   @Transactional
   public FindPdaResult find(FindPdaCommand command) {
     lombok.val a = actor.get();
-    long deviceId = command.deviceId();
-    lombok.val d = devices.find(deviceId, a.storeId());
+    return findForStore(command.deviceId(), a.storeId(), a.id());
+  }
+
+  @Transactional
+  public FindPdaResult findFromWeb(long deviceId) {
+    return findForStore(deviceId, found(devices.identity(deviceId)).storeId(), null);
+  }
+
+  private FindPdaResult findForStore(long deviceId, long storeId, Long requesterId) {
+    lombok.val d = devices.find(deviceId, storeId);
     if (d == null) throw new DeviceNotInStoreException();
     // A disabled or delayed scheduler must not leave this device blocked indefinitely.
-    for (lombok.val expired : repo.expireForDevice(deviceId, a.storeId())) {
+    for (lombok.val expired : repo.expireForDevice(deviceId, storeId)) {
       repo.log(
           expired.id(), deviceId, PdaFindStatus.EXPIRED.name(), "No completion before deadline");
     }
     UUID id = UUID.randomUUID();
-    if (repo.create(id, a.id(), a.storeId(), deviceId, Instant.now().plusSeconds(timeout)) == 0) {
+    if (repo.create(id, requesterId, storeId, deviceId, Instant.now().plusSeconds(timeout)) == 0) {
       throw new DomainException(
           409,
           "This PDA already has an active finder request. Stop the current alarm or wait for it to"
               + " expire.");
     }
     repo.log(id, deviceId, PdaFindStatus.QUEUED.name(), null);
-    ops.enqueue("FIND", id.toString(), "{\"storeId\":" + a.storeId() + "}");
-    ops.audit(a.id(), a.storeId(), "PDA_FIND", id.toString());
-    return FindPdaResult.from(found(repo.find(id, a.storeId())));
+    ops.enqueue("FIND", id.toString(), "{\"storeId\":" + storeId + "}");
+    audit(requesterId, storeId, "PDA_FIND", id);
+    return FindPdaResult.from(found(repo.find(id, storeId)));
   }
 
   public FindPdaResult status(UUID id) {
@@ -104,12 +112,30 @@ public class PdaFinderService implements FinderUseCase {
   @Transactional
   public void stop(UUID id) {
     lombok.val a = actor.get();
-    lombok.val r = found(repo.find(id, a.storeId()));
+    stopForStore(id, a.storeId(), a.id());
+  }
+
+  public FindPdaResult statusFromWeb(UUID id) {
+    return FindPdaResult.from(found(repo.findAny(id)));
+  }
+
+  @Transactional
+  public void stopFromWeb(UUID id) {
+    stopForStore(id, found(repo.findAny(id)).storeId(), null);
+  }
+
+  private void stopForStore(UUID id, long storeId, Long requesterId) {
+    lombok.val r = found(repo.find(id, storeId));
     if (repo.status(id, PdaFindStatus.STOPPED.name()) == 1) {
       repo.log(id, r.deviceId(), "STOP_REQUESTED", null);
-      ops.enqueue("STOP", id.toString(), "{\"storeId\":" + a.storeId() + "}");
-      ops.audit(a.id(), a.storeId(), "PDA_STOP", id.toString());
+      ops.enqueue("STOP", id.toString(), "{\"storeId\":" + storeId + "}");
+      audit(requesterId, storeId, "PDA_STOP", id);
     }
+  }
+
+  private void audit(Long requesterId, long storeId, String action, UUID id) {
+    if (requesterId == null) ops.systemAudit(storeId, action + "_WEB", id.toString());
+    else ops.audit(requesterId, storeId, action, id.toString());
   }
 
   @Transactional

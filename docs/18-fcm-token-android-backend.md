@@ -9,7 +9,7 @@ Tài liệu mô tả code hiện tại của dự án PDA, đối chiếu ngày 
 | `fcmToken` | Firebase SDK lấy từ dịch vụ Firebase | Backend chỉ định app đích khi gửi push |
 | `deviceId` | Backend khi đăng ký PDA | Xác định bản ghi thiết bị trong hệ thống |
 | `deviceSecret` | Backend khi đăng ký PDA | Xác thực các API dành cho thiết bị |
-| Access token/JWT | Backend khi đăng nhập | Xác thực người dùng, ví dụ manager đăng ký hoặc tìm PDA |
+| Access token/JWT | Backend khi đăng nhập | Xác thực nhân viên/quản lý khi đăng ký PDA; website tìm/dừng không có JWT |
 
 `fcmToken` có thể thay đổi. Backend lưu giá trị hiện tại trong bản ghi thiết bị và dùng nó làm địa chỉ gửi push. Token này không thay thế JWT hoặc `deviceSecret`.
 
@@ -53,7 +53,7 @@ Sơ đồ minh họa trường hợp token có trước đăng ký. Nếu đăng
 
 - Bật `FCM_ENABLED=true`, tương ứng `app.fcm-enabled`.
 - Cung cấp Application Default Credentials có quyền gửi tới Firebase project của app. Với môi trường local, cách cấu hình credential được mô tả trong tài liệu triển khai.
-- Bật `app.scheduler-enabled=true` để scheduler xử lý outbox; profile dev hiện đặt giá trị này là `false`.
+- Bật `app.scheduler-enabled=true` để scheduler xử lý outbox; profile dev hiện mặc định bật, có thể ghi đè bằng `APP_SCHEDULER_ENABLED`.
 
 Android có thể lấy token dù backend chưa bật gửi FCM. Backend cũng có thể lưu token khi FCM bị tắt; hai bước này độc lập với việc gửi push.
 
@@ -135,7 +135,7 @@ Request minh họa:
 
 ```http
 POST /devices/register
-Authorization: Bearer <manager-access-token>
+Authorization: Bearer <employee-or-manager-access-token>
 Content-Type: application/json
 
 {
@@ -145,7 +145,7 @@ Content-Type: application/json
 }
 ```
 
-Nếu chưa có token, giá trị là JSON `null` hoặc trường bị bỏ qua khi serialize; không gửi chuỗi `"null"`. API đăng ký yêu cầu role `MANAGER`. Backend lưu thiết bị, token nếu có, và trả về `deviceId`, `deviceSecret` để Android lưu.
+Nếu chưa có token, giá trị là JSON `null` hoặc trường bị bỏ qua khi serialize; không gửi chuỗi `"null"`. API đăng ký yêu cầu role `MANAGER` hoặc `EMPLOYEE`. Home mở form sau login nếu máy chưa đăng ký. Backend lưu thiết bị, token nếu có, và trả về `deviceId`, `deviceSecret` để Android lưu.
 
 Sau đăng ký thành công, [HomeViewModel.register()](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeViewModel.java) gọi lại `modules.fcm.initialize()` và khởi động dịch vụ fallback.
 
@@ -206,19 +206,15 @@ Token nằm ở `devices.fcm_token`; schema có unique index cho token khác NUL
 
 ## 7. Backend dùng token để gửi FIND/STOP
 
-### Bước 1: Manager tạo yêu cầu tìm PDA
+### Bước 1: Website React tạo yêu cầu tìm PDA
 
 ```http
-POST /pda/find
-Authorization: Bearer <manager-access-token>
-Content-Type: application/json
-
-{"deviceId": 123}
+POST /web/finder/devices/123/find
 ```
 
-[PdaFinderService.find()](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java) kiểm tra PDA thuộc cửa hàng của người dùng, tạo request có hạn dùng và đưa sự kiện `FIND` vào outbox trong transaction. Yêu cầu vẫn được tạo khi chưa có token để có thể nhận qua polling.
+[PdaFinderService.findFromWeb()](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java) lấy cửa hàng từ PDA trong database, tạo request có hạn dùng và đưa sự kiện `FIND` vào outbox trong transaction. Web không yêu cầu login; request/audit không có actor người dùng. Yêu cầu vẫn được tạo khi chưa có token để PDA đã chọn cấu hình `finderTransport=polling` có thể nhận qua HTTP; bản FCM không tự chuyển chế độ.
 
-Lệnh dừng đi qua `POST /pda/stop` với body `{"requestId":"<uuid>"}`, cập nhật trạng thái và đưa `STOP` vào outbox khi cập nhật có hiệu lực.
+Lệnh dừng đi qua `POST /web/finder/requests/{id}/stop` không có JWT/body, cập nhật trạng thái và đưa `STOP` vào outbox khi cập nhật có hiệu lực.
 
 ### Bước 2: Xử lý outbox
 
@@ -230,7 +226,7 @@ Lệnh dừng đi qua `POST /pda/stop` với body `{"requestId":"<uuid>"}`, cậ
 push.send(device.fcmToken(), event.eventType(), request.id(), request.expiresAt());
 ```
 
-Token được đọc tại lúc xử lý outbox; payload outbox chứa thông tin cửa hàng để tìm request, không chụp cố định token tại lúc manager nhấn tìm. Token dùng là của PDA đích, không phải của máy manager.
+Token được đọc tại lúc xử lý outbox; payload outbox chứa thông tin cửa hàng để tìm request, không chụp cố định token tại lúc người dùng website nhấn Tìm. Token dùng là của PDA đích, không phải của trình duyệt web.
 
 ### Bước 3: Firebase Admin SDK gửi data message
 
@@ -256,7 +252,7 @@ Gửi thành công: processor ghi `PUSH_FIND` hoặc `PUSH_STOP`; với FIND cò
 
 ## 8. Android nhận lệnh và xác nhận kết quả
 
-`PdaFirebaseMessagingService.onMessageReceived()` kiểm tra UUID và loại lệnh FIND/STOP, cập nhật trạng thái FCM rồi chuyển xử lý lên main thread qua [FinderCommandHandler](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderCommandHandler.java).
+`PdaFirebaseMessagingService.onMessageReceived()` chỉ xử lý khi `BuildConfig.FINDER_TRANSPORT` là `fcm` (mặc định); bản `polling` bỏ qua message. Receiver kiểm tra UUID và loại lệnh FIND/STOP, cập nhật trạng thái FCM rồi chuyển xử lý lên main thread qua [FinderCommandHandler](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderCommandHandler.java).
 
 - FIND kiểm tra hạn dùng, request đã xử lý hoặc đang phát chuông để tránh lặp.
 - Với FCM, chỉ message có priority HIGH được cho phép thử bật chuông trực tiếp; FIND không HIGH hiển thị thông báo fallback và ghi `DELIVERY_ERROR`.
@@ -272,7 +268,7 @@ Phải phân biệt: token đã lưu, gửi push thành công và PDA đã phát
 | Tình huống | Hành vi hiện tại |
 | --- | --- |
 | Android chưa cấu hình Firebase | Ghi lỗi local `NOT_CONFIGURED` |
-| Android lấy token lỗi | Ghi `TOKEN_ERROR`; dịch vụ polling gọi cơ chế thử lấy lại token khi đang hoạt động |
+| Android lấy token lỗi | Ghi `TOKEN_ERROR`; thử lại khi Home resume, ngoài lần initialize khi app khởi động |
 | Backend không có token | Outbox ghi `NO_TOKEN`, kết thúc sự kiện outbox; request vẫn có thể được lấy qua polling |
 | Firebase trả `UNREGISTERED` | Adapter chuyển thành `InvalidToken`; processor xóa token tương ứng và ghi `INVALID_TOKEN` |
 | Gửi push gặp lỗi khác hoặc FCM bị tắt | Ghi `RETRY`, thử lại outbox có giới hạn; hết lượt không tự đóng đường nhận lệnh HTTP |
@@ -287,7 +283,7 @@ WHERE id = #{id} AND fcm_token = #{token}
 
 Điều kiện này tránh xóa nhầm token mới nếu một cập nhật token khác đã xảy ra.
 
-`GET /pda/fcm-health` báo cần fallback khi FCM bị tắt, backend thiếu token hoặc sự kiện push gần nhất cho thấy lỗi. Android lấy lệnh qua polling khi có lỗi FCM local hoặc backend; khi cả hai hết lỗi thì ngừng lấy lệnh và tiếp tục kiểm tra sức khỏe định kỳ.
+`GET /pda/fcm-health` vẫn báo `fallbackRequired` khi FCM bị tắt, backend thiếu token hoặc sự kiện push gần nhất cho thấy lỗi, để chẩn đoán/tương thích client cũ. Android hiện tại không gọi health định kỳ và không tự chuyển transport. Mặc định `finderTransport=fcm`; chỉ APK build với `finderTransport=polling` lấy lệnh HTTP mỗi 5 giây, bất kể tình trạng FCM. Lỗi token không tự bật polling.
 
 Các giới hạn cần hiểu khi debug code hiện tại:
 
@@ -296,16 +292,16 @@ Các giới hạn cần hiểu khi debug code hiện tại:
 - Không có token mới không đồng nghĩa FCM lỗi; một token có thể tiếp tục được dùng qua nhiều lần mở app.
 - FCM chấp nhận gửi nhưng thiết bị không nhận được âm thầm chưa chắc được health hiện tại phát hiện.
 
-Xem chi tiết điều kiện, chu kỳ và giới hạn tại [fallback FCM xuống polling](16-fcm-to-polling-fallback.md).
+Xem cách build/cài APK đổi chế độ tại [cấu hình FCM hoặc polling](16-fcm-to-polling-fallback.md).
 
 ## 10. Cách kiểm tra luồng khi phát triển
 
 1. Cấu hình Firebase client/backend và bật scheduler theo mục 3.
 2. Đặt breakpoint ở `FcmTokenManager.refreshed()`; mở app, kiểm tra có token và token đã lưu. Có thể kiểm tra bước này trước đăng nhập.
-3. Đăng nhập manager và đăng ký PDA. Kiểm tra nhận `deviceId`, `deviceSecret`.
+3. Đăng nhập nhân viên/quản lý và hoàn thành form đăng ký PDA tại Home. Kiểm tra nhận `deviceId`, `deviceSecret`.
 4. Theo dõi request đăng ký hoặc `PUT /devices/token`; kiểm tra backend lưu `devices.fcm_token` và audit đồng bộ khi đi qua API cập nhật.
-5. Từ manager, tạo yêu cầu tìm đúng PDA đã đăng ký; theo dõi request, outbox và log `PUSH_FIND`/lỗi tương ứng.
-6. Đặt breakpoint ở `onMessageReceived()` để xác nhận lệnh thực sự đến qua FCM; việc PDA phát chuông riêng lẻ chưa chứng minh kênh FCM vì polling cũng có thể nhận lệnh.
+5. Từ website React, tạo yêu cầu tìm đúng PDA đã đăng ký; theo dõi request, outbox và log `PUSH_FIND`/lỗi tương ứng.
+6. Dùng APK `finderTransport=fcm`, đặt breakpoint sau kiểm tra transport trong `onMessageReceived()` để xác nhận lệnh đến qua FCM. APK `polling` bỏ qua message FCM.
 7. Kiểm tra sự kiện `RINGING` gửi về backend, sau đó thử STOP và kiểm tra chuông dừng.
 
 Có thể kiểm tra token đã có trong database mà không in toàn bộ giá trị:

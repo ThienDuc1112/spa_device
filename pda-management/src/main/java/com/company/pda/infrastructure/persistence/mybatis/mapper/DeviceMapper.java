@@ -4,6 +4,18 @@ import com.company.pda.infrastructure.persistence.mybatis.entity.DeviceEntity;
 import org.apache.ibatis.annotations.Param;
 
 public interface DeviceMapper {
+  DeviceEntity lock(long id);
+
+  boolean hasActiveFinder(long id);
+
+  int deleteFinderOutbox(long id);
+
+  int deleteFinderLogs(long id);
+
+  int deleteFinderRequests(long id);
+
+  int delete(long id);
+
   DeviceEntity find(@Param("id") long id, @Param("storeId") long storeId);
 
   DeviceEntity identity(long id);

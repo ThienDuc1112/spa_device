@@ -15,6 +15,24 @@ public class MyBatisDeviceRepository implements DeviceRepository {
   }
 
   @Override
+  public Device lock(long id) {
+    return DeviceEntityMapper.toDomain(mapper.lock(id));
+  }
+
+  @Override
+  public boolean hasActiveFinder(long id) {
+    return mapper.hasActiveFinder(id);
+  }
+
+  @Override
+  public void delete(long id) {
+    mapper.deleteFinderOutbox(id);
+    mapper.deleteFinderLogs(id);
+    mapper.deleteFinderRequests(id);
+    mapper.delete(id);
+  }
+
+  @Override
   public Device find(long id, long storeId) {
     return DeviceEntityMapper.toDomain(mapper.find(id, storeId));
   }

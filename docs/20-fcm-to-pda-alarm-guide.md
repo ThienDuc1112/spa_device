@@ -2,13 +2,13 @@
 
 Tài liệu đối chiếu code trong repository ngày 03/10/2026. Backend dùng Java 8 / Spring Boot 2.7.0; source Android dùng Java 17 và Gradle JDK 21. Các đoạn code dưới đây là trích đoạn từ dự án, có thể lược bỏ import và phần không liên quan; mở liên kết nguồn để xem class đầy đủ.
 
-**FCM chuyển lệnh tới PDA. Chính app Android mở foreground service và phát âm thanh có sẵn trong APK.** Backend không truyền file nhạc và FCM không trực tiếp điều khiển loa.
+**FCM chuyển lệnh tới PDA. Chính app Android mở foreground service và phát âm thanh có sẵn trong APK.** Backend không truyền file nhạc và FCM không trực tiếp điều khiển loa. (updated)
 
 ## 1. Luồng tổng thể
 
 ```mermaid
 sequenceDiagram
-    actor Manager as Người quản lý
+    actor Manager as Người dùng website React
     participant API as Backend REST API
     participant DB as PostgreSQL
     participant Worker as OutboxScheduler / OutboxProcessor
@@ -16,7 +16,7 @@ sequenceDiagram
     participant Receiver as PdaFirebaseMessagingService
     participant Alarm as PdaAlarmService / DeviceAlarmAdapter
     participant Sync as SyncWorker
-    Manager->>API: POST /pda/find {deviceId} + access token
+    Manager->>API: POST /web/finder/devices/{deviceId}/find (không JWT)
     API->>DB: Transaction: tạo QUEUED, ghi log và outbox FIND
     API-->>Manager: id, status, expiresAt
     Worker->>DB: Lấy outbox chưa xử lý và FCM token của PDA
@@ -31,20 +31,20 @@ sequenceDiagram
     Alarm->>Sync: Lưu sự kiện RINGING vào Room
     Sync->>API: POST /pda/events + device credential
     API->>DB: Cập nhật trạng thái và log
-    Manager->>API: GET /pda/find/{id}
+    Manager->>API: GET /web/finder/devices (kèm request gần nhất)
     API-->>Manager: Trạng thái mới nhất
 ```
 
 Đây là luồng thành công. Việc giao FCM và ghi `SENT` có thể chạy đan xen; backend chỉ đổi sang `SENT` nếu trạng thái vẫn là `QUEUED`, nên không ghi đè `RINGING` đã nhận sớm.
 
-| Dữ liệu | Vai trò |
-| --- | --- |
-| `deviceId` | ID của thiết bị trong database backend |
-| `fcmToken` | Địa chỉ gửi FCM tới một bản cài app; có thể thay đổi |
-| `deviceSecret` | Credential cho PDA gọi API token, sự kiện và polling |
-| Access token người dùng | Xác thực người quản lý khi đăng ký/tìm/dừng PDA |
-| `requestId` | UUID của một lần tìm; dùng chống lặp và ghép sự kiện |
-| `expiresAt` | Thời hạn tuyệt đối của lần tìm, chuỗi thời gian UTC |
+| Dữ liệu                 | Vai trò                                                           |
+| ----------------------- | ----------------------------------------------------------------- |
+| `deviceId`              | ID của thiết bị trong database backend                            |
+| `fcmToken`              | Địa chỉ gửi FCM tới một bản cài app; có thể thay đổi              |
+| `deviceSecret`          | Credential cho PDA gọi API token, sự kiện và polling              |
+| Access token người dùng | Android dùng khi đăng ký PDA sau login; web tìm/dừng không có JWT |
+| `requestId`             | UUID của một lần tìm; dùng chống lặp và ghép sự kiện              |
+| `expiresAt`             | Thời hạn tuyệt đối của lần tìm, chuỗi thời gian UTC               |
 
 FCM token không thay thế device secret hoặc access token. Các loại token này không được dùng lẫn nhau.
 
@@ -55,7 +55,7 @@ FCM token không thay thế device secret hoặc access token. Các loại token
 1. Trong Firebase project, đăng ký Android app với package **`com.company.pda`**.
 2. Đặt cấu hình client tại `pda-android/app/google-services.json`, rồi Gradle Sync và cài lại APK.
 3. Emulator dùng image có Google Play services; PDA cần môi trường hỗ trợ Firebase Messaging và kết nối mạng.
-4. Mở app, cấp quyền thông báo, đăng nhập manager và **Register this PDA**.
+4. Mở app, cấp quyền thông báo, đăng nhập nhân viên/quản lý, hoàn thành form đăng ký tại Home.
 5. Kiểm tra **Finder sound settings** trước khi thử gửi lệnh.
 
 [app/build.gradle](../pda-android/app/build.gradle) hiện có:
@@ -69,7 +69,7 @@ implementation platform('com.google.firebase:firebase-bom:33.10.0')
 implementation 'com.google.firebase:firebase-messaging'
 ```
 
-Nếu thiếu file client, app vẫn build được nhưng không có cấu hình Firebase mặc định; luồng hiện tại ghi nhận `NOT_CONFIGURED` và có thể dùng polling.
+Nếu thiếu file client, app vẫn build được nhưng không có cấu hình Firebase mặc định; luồng hiện tại ghi nhận `NOT_CONFIGURED`, không tự chuyển sang polling. Mặc định `finderTransport=fcm`; chỉ APK được build/cài rõ với `finderTransport=polling` mới nhận lệnh HTTP (mục 11).
 
 [AndroidManifest.xml](../pda-android/app/src/main/AndroidManifest.xml) đăng ký receiver và service phát chuông:
 
@@ -105,7 +105,7 @@ $env:GOOGLE_APPLICATION_CREDENTIALS = 'C:\credentials\firebase-admin.json'
   --app.scheduler-enabled=true
 ```
 
-Backend và PostgreSQL phải khởi động được trước. Profile `dev` trong repository tắt scheduler mặc định, nên tham số bật scheduler rất quan trọng khi thử push. Có thể đặt cùng hai tham số trong **Program arguments** của cấu hình Run trên IntelliJ; credential đặt ở **Environment variables**.
+Backend và PostgreSQL phải khởi động được trước. Profile `dev` hiện bật scheduler mặc định; đặt `APP_SCHEDULER_ENABLED=true` hoặc tham số này để bảo đảm tiến trình đang chạy có bật scheduler. Có thể đặt cùng hai tham số trong **Program arguments** của cấu hình Run trên IntelliJ; credential đặt ở **Environment variables**.
 
 [FirebaseConfig.java](../pda-management/src/main/java/com/company/pda/infrastructure/firebase/FirebaseConfig.java) lấy Application Default Credentials và tạo Firebase client:
 
@@ -174,48 +174,37 @@ Content-Type: application/json
 
 Backend lưu token ở `devices.fcm_token`. Chi tiết vòng đời token: [18-fcm-token-android-backend.md](18-fcm-token-android-backend.md).
 
-## 4. Backend nhận yêu cầu Find
+## 4. Backend nhận yêu cầu Find từ React
 
-Người quản lý gọi:
+Website gọi API công khai, không JWT/body:
 
 ```http
-POST /pda/find
-Authorization: Bearer <manager-access-token>
-Content-Type: application/json
-
-{"deviceId":123}
+POST /web/finder/devices/123/find
 ```
 
-[PdaFinderController.java](../pda-management/src/main/java/com/company/pda/presentation/rest/pdafinder/PdaFinderController.java):
+[WebFinderController.java](../pda-management/src/main/java/com/company/pda/presentation/rest/pdafinder/WebFinderController.java):
 
 ```java
-@PostMapping("/find")
-@PreAuthorize("hasRole('MANAGER')")
-public FindPdaResponse find(@Valid @RequestBody FindPdaRequest b) {
-  return FindPdaResponse.from(service.find(b.toCommand()));
+@PostMapping("/devices/{deviceId}/find")
+public FindPdaResponse find(@PathVariable long deviceId) {
+  return FindPdaResponse.from(finder.findFromWeb(deviceId));
 }
 ```
 
-[PdaFinderService.java](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java) chạy trong `@Transactional`. Service kiểm tra PDA thuộc cửa hàng của manager, xử lý yêu cầu cũ đã hết hạn, rồi tạo yêu cầu mới:
+[PdaFinderService.java](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java):
 
 ```java
-UUID id = UUID.randomUUID();
-if (repo.create(id, a.id(), a.storeId(), deviceId,
-    Instant.now().plusSeconds(timeout)) == 0) {
-  throw new DomainException(
-      409,
-      "This PDA already has an active finder request. Stop the current alarm or wait for it to"
-          + " expire.");
+@Transactional
+public FindPdaResult findFromWeb(long deviceId) {
+  return findForStore(deviceId, found(devices.identity(deviceId)).storeId(), null);
 }
-repo.log(id, deviceId, PdaFindStatus.QUEUED.name(), null);
-ops.enqueue("FIND", id.toString(), "{\"storeId\":" + a.storeId() + "}");
-ops.audit(a.id(), a.storeId(), "PDA_FIND", id.toString());
-return FindPdaResult.from(found(repo.find(id, a.storeId())));
 ```
 
-`timeout` lấy từ `app.finder-timeout-seconds`, mặc định cấu hình 60 giây, được giới hạn từ 10 đến 300 giây. Chỉ một lần tìm đang hoạt động được phép tồn tại cho một PDA.
+`findForStore()` dùng chung với API manager cũ: xác minh thiết bị/cửa hàng, xử lý request cũ hết hạn, tạo request QUEUED, ghi log, outbox FIND và audit cùng transaction. Với web, requesterId là null, audit `PDA_FIND_WEB` có actor null; không mượn user đăng ký PDA để đại diện người dùng web. Migration V7 cho phép requester_id null.
 
-Outbox được ghi cùng transaction với yêu cầu tìm. Vì vậy API trả `QUEUED` không có nghĩa FCM đã được gửi; worker xử lý outbox sau đó. Dữ liệu trong outbox chứa thông tin phục vụ worker, khác với payload gửi xuống PDA.
+`timeout` mặc định 60 giây, giới hạn 10–300 giây. Chỉ một request active trên mỗi PDA; trùng còn hạn trả 409. API trả QUEUED chưa có nghĩa FCM đã gửi. Cửa hàng lấy từ database, không từ giá trị web cung cấp. API manager cũ vẫn yêu cầu JWT và giới hạn cửa hàng.
+
+Chi tiết website, API và đăng ký mới: [21-react-device-finder.md](21-react-device-finder.md).
 
 ## 5. Worker gửi data message qua FCM
 
@@ -285,13 +274,13 @@ Message không có trường `notification`. Dự án dùng **data message** đ�
 
 Xử lý lỗi ở worker:
 
-| Trường hợp | Xử lý hiện tại |
-| --- | --- |
-| Thiếu token | Ghi `NO_TOKEN`, hoàn thành outbox; vẫn để polling nhận yêu cầu chưa hết hạn |
-| Firebase trả `UNREGISTERED` | Xóa token tương ứng, ghi `INVALID_TOKEN`, hoàn thành outbox |
-| Lỗi gửi khác | Ghi `RETRY`; retry có backoff khi còn thời gian và chưa đạt ngưỡng attempts |
-| Hết retry | Hoàn thành sự kiện gửi; không đóng sớm đường polling |
-| FIND đã hết hạn/kết thúc | Bỏ sự kiện FIND cũ, không gửi chuông muộn |
+| Trường hợp                  | Xử lý hiện tại                                                              |
+| --------------------------- | --------------------------------------------------------------------------- |
+| Thiếu token                 | Ghi `NO_TOKEN`, hoàn thành outbox; vẫn để polling nhận yêu cầu chưa hết hạn |
+| Firebase trả `UNREGISTERED` | Xóa token tương ứng, ghi `INVALID_TOKEN`, hoàn thành outbox                 |
+| Lỗi gửi khác                | Ghi `RETRY`; retry có backoff khi còn thời gian và chưa đạt ngưỡng attempts |
+| Hết retry                   | Hoàn thành sự kiện gửi; không đóng sớm đường polling                        |
+| FIND đã hết hạn/kết thúc    | Bỏ sự kiện FIND cũ, không gửi chuông muộn                                   |
 
 ## 6. Android nhận FCM và kiểm tra lệnh
 
@@ -299,6 +288,7 @@ Xử lý lỗi ở worker:
 
 ```java
 public void onMessageReceived(RemoteMessage message) {
+  if (!"fcm".equals(BuildConfig.FINDER_TRANSPORT)) return;
   var data = message.getData();
   try {
     java.util.UUID.fromString(data.get("requestId"));
@@ -398,12 +388,12 @@ active = true;
 return check();
 ```
 
-| Class | Trách nhiệm |
-| --- | --- |
-| `AndroidAudioModeController` | Kiểm tra DND, xin audio focus, theo dõi mất focus |
-| `AndroidVolumeController` | Lưu âm lượng/mute cũ, bỏ mute và tăng `STREAM_ALARM`, khôi phục khi dừng |
-| `AndroidAlarmPlayer` | Phát file âm thanh lặp lại, chọn loa tích hợp và kiểm tra playback |
-| `AlarmTimeoutManager` | Dừng service khi tới deadline |
+| Class                        | Trách nhiệm                                                              |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `AndroidAudioModeController` | Kiểm tra DND, xin audio focus, theo dõi mất focus                        |
+| `AndroidVolumeController`    | Lưu âm lượng/mute cũ, bỏ mute và tăng `STREAM_ALARM`, khôi phục khi dừng |
+| `AndroidAlarmPlayer`         | Phát file âm thanh lặp lại, chọn loa tích hợp và kiểm tra playback       |
+| `AlarmTimeoutManager`        | Dừng service khi tới deadline                                            |
 
 Trong [AndroidVolumeController.java](../pda-android/device-android/src/main/java/com/company/device/android/AndroidVolumeController.java), sau khi lưu trạng thái để phục hồi:
 
@@ -454,7 +444,7 @@ public static boolean allowsAlarm(int filter, boolean priorityAllowsAlarms) {
 
 Thiết lập trên PDA: **Finder sound settings → Grant Do Not Disturb access → Configure Do Not Disturb / allow alarms → cho phép Alarms trong các chế độ đang hoạt động → Test this PDA speaker (5 seconds)**.
 
-`USAGE_ALARM`, FCM priority HIGH và notification importance HIGH không tự bỏ qua DND chặn báo thức. Code hiện tại không gọi API để tắt DND. Với app target 35 trên Android 15 trở lên, các API thay đổi DND toàn cục bị giới hạn thành rule của app; không nên xem chúng là cách bảo đảm ép mọi máy phát tiếng. Xem [NotificationManager](https://developer.android.com/reference/android/app/NotificationManager#setInterruptionFilter(int)).
+`USAGE_ALARM`, FCM priority HIGH và notification importance HIGH không tự bỏ qua DND chặn báo thức. Code hiện tại không gọi API để tắt DND. Với app target 35 trên Android 15 trở lên, các API thay đổi DND toàn cục bị giới hạn thành rule của app; không nên xem chúng là cách bảo đảm ép mọi máy phát tiếng. Xem [NotificationManager](<https://developer.android.com/reference/android/app/NotificationManager#setInterruptionFilter(int)>).
 
 ## 9. PDA báo kết quả về backend
 
@@ -488,14 +478,14 @@ Content-Type: application/json
 
 Backend xác thực secret, kiểm tra đúng thiết bị/cửa hàng và chỉ chuyển trạng thái khi yêu cầu còn hoạt động. `RINGING` đến sau deadline được chuyển thành `EXPIRED`. Event đến muộn không mở lại yêu cầu đã `STOPPED`.
 
-| Trạng thái | Ý nghĩa thực tế |
-| --- | --- |
-| `QUEUED` | Backend đã tạo yêu cầu; chưa xác nhận gửi FCM |
-| `SENT` | Lời gọi gửi FCM thành công; chưa xác nhận PDA phát tiếng |
-| `RINGING` | PDA báo playback vượt qua các kiểm tra phần mềm; chưa chứng minh người dùng nghe được loa |
-| `STOPPED` | Đã nhận lệnh dừng hoặc PDA đã báo dừng; dừng từ xa có thể được ghi trước khi máy đích nhận STOP |
-| `FAILED` | PDA báo không phát/duy trì âm thanh được |
-| `EXPIRED` | Backend kết thúc yêu cầu quá thời hạn |
+| Trạng thái | Ý nghĩa thực tế                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| `QUEUED`   | Backend đã tạo yêu cầu; chưa xác nhận gửi FCM                                                   |
+| `SENT`     | Lời gọi gửi FCM thành công; chưa xác nhận PDA phát tiếng                                        |
+| `RINGING`  | PDA báo playback vượt qua các kiểm tra phần mềm; chưa chứng minh người dùng nghe được loa       |
+| `STOPPED`  | Đã nhận lệnh dừng hoặc PDA đã báo dừng; dừng từ xa có thể được ghi trước khi máy đích nhận STOP |
+| `FAILED`   | PDA báo không phát/duy trì âm thanh được                                                        |
+| `EXPIRED`  | Backend kết thúc yêu cầu quá thời hạn                                                           |
 
 `PUSH_FIND`, `PUSH_STOP`, `RETRY`, `NO_TOKEN`, `INVALID_TOKEN` là **sự kiện log**, không phải trạng thái của `pda_find_requests`.
 
@@ -503,7 +493,7 @@ Backend xác thực secret, kiểm tra đúng thiết bị/cửa hàng và chỉ
 
 Có ba đường dừng:
 
-1. **Từ màn hình quản lý:** `POST /pda/stop` với `requestId`; backend chuyển trạng thái, tạo outbox STOP; worker gửi data message `command=STOP`.
+1. **Từ website React:** `POST /web/finder/requests/{id}/stop`; backend chuyển trạng thái, tạo outbox STOP; worker gửi data message `command=STOP`.
 2. **Tại PDA:** người dùng bấm Stop alarm ở popup/notification; service dừng và xếp hàng sự kiện `STOPPED`.
 3. **Tự hết hạn:** `AlarmTimeoutManager` gọi `stopSelf()` theo deadline. Dừng local theo đường này vẫn xếp hàng `STOPPED`; kết quả database còn phụ thuộc scheduler/event nào tới trước, không phải lúc nào cũng là `EXPIRED`.
 
@@ -529,37 +519,44 @@ public void stop(String id) {
 
 Dấu `handled:<id>` được lưu ngay cả khi chưa reo: nếu STOP tới trước FIND, FIND trễ cùng ID sẽ bị bỏ qua. Khi service kết thúc, nó hủy timer, giải phóng player/audio focus và khôi phục âm lượng. Nếu khôi phục bị hệ thống chặn, snapshot được giữ để thử phục hồi khi app khởi động lại.
 
-## 11. Polling dự phòng và cách phân biệt với FCM
+## 11. FCM mặc định, chỉ chuyển polling bằng cấu hình
 
-[FinderPollingCycle.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderPollingCycle.java) kiểm tra `/pda/fcm-health` theo nhịp 15 giây. Khi PDA hoặc backend đã ghi nhận FCM không khả dụng, mới lấy `/pda/commands` theo nhịp khoảng 5 giây cộng thời gian HTTP:
+Trong [gradle.properties](../pda-android/gradle.properties), `finderTransport=fcm` là mặc định. Ở chế độ này app không chạy `FinderPollingService`, không lấy `/pda/commands` và không gọi `/pda/fcm-health` định kỳ. Thiếu token, FCM bị hạ priority, lỗi gửi push hoặc `app.fcm-enabled=false` đều không tự bật polling.
 
-```java
-if (!localFcmFailed && !backendFailed) {
-  delaySeconds = 15;
-  return List.of();
-}
-delaySeconds = 5;
-return transport.commands();
+Muốn dùng polling, đổi thành `finderTransport=polling`, Gradle Sync rồi build/cài lại APK trên **PDA đích**. Hoặc chạy từ thư mục `pda-android`:
+
+```powershell
+.\gradlew.bat :app:assembleDebug -PfinderTransport=polling
+# Trở lại FCM:
+.\gradlew.bat :app:assembleDebug -PfinderTransport=fcm
 ```
 
-Lệnh polling cũng đi qua `FinderCommandHandler`, rồi dùng cùng service phát âm thanh. Polling không vượt DND hoặc giới hạn foreground-service start. Lỗi HTTP đơn lẻ không tự chứng minh FCM hỏng; thiếu ACK cũng không tự bật fallback. Nếu FCM nhận gửi nhưng không giao message và không có tín hiệu lỗi nào khác, cơ chế hiện tại không bảo đảm chuyển sang polling.
+Mở Home sau khi cài. `app/build.gradle` sinh `BuildConfig.FINDER_TRANSPORT` và từ chối giá trị khác `fcm`/`polling`. Cấu hình áp dụng lúc build, không đổi runtime. Bản polling bỏ qua message trong receiver FCM, lấy lệnh HTTP mỗi 5 giây sau lượt thành công. [FinderPollingCycle.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderPollingCycle.java):
+
+```java
+public List<Command> run() throws IOException {
+  return enabled ? transport.commands() : List.of();
+}
+```
+
+Lệnh polling cũng đi qua `FinderCommandHandler`, rồi dùng cùng service phát âm thanh. Polling không vượt DND hoặc giới hạn foreground-service start. Lỗi HTTP có backoff tối đa 60 giây; 401/403 dừng service. API health vẫn tồn tại để chẩn đoán/client cũ, không chọn transport của Android hiện tại. Backend vẫn cần bật FCM và có credential để phục vụ PDA dùng FCM; có thể tắt gửi push nếu toàn bộ PDA đã chọn polling.
 
 Chi tiết: [15-finder-polling.md](15-finder-polling.md), [16-fcm-to-polling-fallback.md](16-fcm-to-polling-fallback.md).
 
 ## 12. Quy trình kiểm thử end-to-end
 
 1. Bật backend với `app.fcm-enabled=true`, `app.scheduler-enabled=true`, credential Firebase hợp lệ.
-2. Cài APK có `google-services.json`, mở app, đăng ký PDA bằng manager cùng cửa hàng.
+2. Build/cài APK `finderTransport=fcm` có `google-services.json`, mở app, đăng ký PDA bằng nhân viên/quản lý thuộc cửa hàng của thiết bị.
 3. Kiểm tra loa/DND bằng nút test âm thanh 5 giây.
-4. Trên PDA quản lý khác hoặc cùng emulator đang mở app, vào **PDA management → Refresh devices → chọn Find**.
+4. Chạy `npm ci` và `npm run dev` trong `pda-web`, mở http://localhost:5173, chọn cửa hàng/thiết bị rồi bấm **Tìm** (không đăng nhập web).
 5. Kiểm tra backend đã tạo request/outbox và có `PUSH_FIND`.
 6. Đặt breakpoint ở `PdaFirebaseMessagingService.onMessageReceived()` để xác nhận message thực sự đến qua FCM. Kiểm tra `command`, `requestId`, `expiresAt` và priority. Không giữ breakpoint quá deadline; nếu cần, tăng `app.finder-timeout-seconds` tối đa 300 khi debug.
-7. Tiếp tục chạy, quan sát foreground notification, tiếng chuông và **Refresh finder status** để thấy `RINGING`.
-8. Bấm Stop alarm từ xa và tại máy đích trong hai lượt test riêng; thử để tự hết hạn.
+7. Tiếp tục chạy, quan sát foreground notification, tiếng chuông và trạng thái tự cập nhật trên website để thấy `RINGING`.
+8. Bấm **Dừng** trên web và Stop alarm tại máy đích trong hai lượt test riêng; thử để tự hết hạn.
 9. Thử app ở nền/khóa màn hình sau khi luồng foreground đã ổn; kiểm tra chính sách pin của thiết bị. Mở app lại sau force-stop trước khi test.
-10. Test riêng fallback với `app.fcm-enabled=false`. Khi đó việc máy reo chứng minh polling hoạt động, chưa chứng minh FCM hoạt động.
+10. Với bản FCM, thử tắt gửi FCM phía backend: xác nhận không tự bật polling. Sau đó build/cài riêng bản `finderTransport=polling`, mở Home và test FIND/STOP qua HTTP. Chỉ tắt FCM backend là chưa đủ để chọn polling.
 
-Vì FCM và polling hội tụ vào cùng handler, chỉ nghe tiếng hoặc thấy `RINGING` không đủ xác định transport. `PUSH_FIND` cũng chỉ chứng minh backend gửi thành công; breakpoint/log ở receiver là bằng chứng trực tiếp cho đường nhận FCM.
+Vì FCM và polling dùng chung handler, khi debug cần kiểm tra `BuildConfig.FINDER_TRANSPORT` của APK đang cài. `PUSH_FIND` chỉ chứng minh backend gửi thành công; breakpoint sau điều kiện chọn transport trong receiver xác nhận Android xử lý đường FCM. Bản polling bỏ qua message FCM dù backend còn gửi push.
 
 Truy vấn đọc để kiểm tra một request (thay UUID ví dụ):
 
@@ -581,17 +578,19 @@ ORDER BY id;
 
 ## 13. Chẩn đoán theo điểm dừng
 
-| Hiện tượng | Điểm cần kiểm tra |
-| --- | --- |
-| Request có nhưng chưa có `PUSH_FIND` | Scheduler dev có bật không; token; outbox; Firebase Admin credential |
-| `NO_TOKEN` | Token SDK đã có và `SyncWorker` đã cập nhật backend chưa |
-| `INVALID_TOKEN` | Token của bản cài app cũ; kiểm tra đồng bộ token mới |
-| `RETRY` | Kết nối Firebase, quyền/project credential, lỗi gửi; xem attempts và thời hạn |
-| `PUSH_FIND` nhưng receiver không chạy | Kết nối PDA, đúng Firebase project/token, trạng thái force-stop, giới hạn giao message |
-| Receiver chạy nhưng không phát | ID trùng/đã handled, thời hạn cũ, priority bị hạ, start service bị chặn |
-| Service báo `FAILED` | DND access/Allow alarms, audio focus, volume, chọn loa; xem `Last finder audio failure` trong sound settings |
-| Có tiếng nhưng backend chưa `RINGING` | Room/WorkManager, mạng, device credential và API `/pda/events` |
-| Find trả 409 | PDA đang có request còn hiệu lực; dừng hoặc chờ hết hạn |
+React đọc `/web/finder/configuration` để hiện cảnh báo FCM/scheduler tắt và hiển thị `lastEvent/lastEventMessage`. Xem [hướng dẫn xóa thiết bị, đăng ký lại và chạy FCM](22-delete-device-and-finder-troubleshooting.md).
+
+| Hiện tượng                            | Điểm cần kiểm tra                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Request có nhưng chưa có `PUSH_FIND`  | Scheduler dev có bật không; token; outbox; Firebase Admin credential                                         |
+| `NO_TOKEN`                            | Token SDK đã có và `SyncWorker` đã cập nhật backend chưa                                                     |
+| `INVALID_TOKEN`                       | Token của bản cài app cũ; kiểm tra đồng bộ token mới                                                         |
+| `RETRY`                               | Kết nối Firebase, quyền/project credential, lỗi gửi; xem attempts và thời hạn                                |
+| `PUSH_FIND` nhưng receiver không chạy | Kết nối PDA, đúng Firebase project/token, trạng thái force-stop, giới hạn giao message                       |
+| Receiver chạy nhưng không phát        | ID trùng/đã handled, thời hạn cũ, priority bị hạ, start service bị chặn                                      |
+| Service báo `FAILED`                  | DND access/Allow alarms, audio focus, volume, chọn loa; xem `Last finder audio failure` trong sound settings |
+| Có tiếng nhưng backend chưa `RINGING` | Room/WorkManager, mạng, device credential và API `/pda/events`                                               |
+| Find trả 409                          | PDA đang có request còn hiệu lực; dừng hoặc chờ hết hạn                                                      |
 
 Tài liệu mô tả code đang có; không khẳng định đã thử giao FCM thật hoặc âm thanh trên mọi model PDA. Các bài test build/backend không thay thế kiểm thử trên thiết bị, đặc biệt với DND, Doze và chính sách OEM.
 

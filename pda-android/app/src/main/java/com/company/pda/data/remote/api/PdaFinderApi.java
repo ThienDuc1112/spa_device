@@ -14,24 +14,12 @@ public interface PdaFinderApi {
   Call<List<Command>> commands(
       @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret);
 
-  @GET("devices")
-  Call<List<Device>> devices();
-
   @POST("devices/register")
   Call<Registration> register(@Body Register body);
 
   @PUT("devices/token")
   Call<Void> token(
       @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret, @Body Token body);
-
-  @POST("pda/find")
-  Call<Request> find(@Body Find body);
-
-  @GET("pda/find/{id}")
-  Call<Request> status(@Path("id") String id);
-
-  @POST("pda/stop")
-  Call<Void> stop(@Body Stop body);
 
   @POST("pda/events")
   Call<Void> event(

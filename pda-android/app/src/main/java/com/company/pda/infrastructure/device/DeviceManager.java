@@ -16,12 +16,20 @@ public final class DeviceManager {
     return info.getDeviceInfo();
   }
 
-  public boolean registered() {
+  public synchronized boolean registered() {
     return storage.get("deviceId") != null && storage.get("deviceSecret") != null;
   }
 
-  public void registered(long id, String secret) {
+  public synchronized void registered(long id, String secret) {
     storage.put("deviceSecret", secret);
     storage.put("deviceId", Long.toString(id));
+  }
+
+  public synchronized boolean clearRegistration(String id, String secret) {
+    if (!java.util.Objects.equals(id, storage.get("deviceId"))
+        || !java.util.Objects.equals(secret, storage.get("deviceSecret"))) return false;
+    storage.put("deviceId", null);
+    storage.put("deviceSecret", null);
+    return true;
   }
 }

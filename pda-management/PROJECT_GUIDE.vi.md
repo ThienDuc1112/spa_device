@@ -202,13 +202,13 @@ Quản lý đầu tiên có thể được tạo bằng bootstrap hoặc seed �
 
 ### 4.2. Đăng ký và xác thực PDA
 
-Người có quyền `MANAGER` gọi `POST /devices/register`. `DeviceService` gắn thiết bị với cửa hàng của người đăng ký, sinh `deviceSecret`, lưu hash của secret và trả `deviceId` cùng secret cho Android.
+Nhân viên hoặc quản lý (`EMPLOYEE`/`MANAGER`) gọi `POST /devices/register` từ form Home sau login trên Android. `DeviceService` gắn thiết bị với cửa hàng của người đăng ký, sinh `deviceSecret`, lưu hash của secret và trả `deviceId` cùng secret cho Android.
 
 Có hai cơ chế xác thực khác nhau:
 
 | Cơ chế | Sử dụng |
 |---|---|
-| `Authorization: Bearer <accessToken>` | Thao tác của người dùng như tìm PDA, điều chỉnh tồn |
+| `Authorization: Bearer <accessToken>` | Đăng ký PDA, điều chỉnh tồn và API manager cũ; web finder không dùng JWT |
 | `X-Device-Id` và `X-Device-Secret` | PDA cập nhật FCM token hoặc gửi sự kiện trạng thái chuông |
 
 `PUT /devices/token` và `POST /pda/events` được cho qua bước bắt buộc JWT, nhưng vẫn kiểm tra thông tin xác thực thiết bị trong service. Chúng không phải API cho phép cập nhật dữ liệu mà không xác thực.
@@ -219,13 +219,13 @@ Có FCM token không chứng minh PDA đang online; trạng thái gửi/nhận c
 
 ```mermaid
 sequenceDiagram
-    participant User as App của quản lý
+    participant User as Website React
     participant Service as PdaFinderService
     participant DB as PostgreSQL
     participant Worker as Scheduler và OutboxProcessor
     participant FCM as Firebase
     participant PDA as PDA đích
-    User->>Service: POST /pda/find
+    User->>Service: POST /web/finder/devices/{deviceId}/find
     Service->>DB: Lưu yêu cầu QUEUED, log, outbox FIND, audit
     Service-->>User: ID và trạng thái yêu cầu
     Worker->>DB: Lấy sự kiện outbox chưa xử lý
@@ -235,13 +235,13 @@ sequenceDiagram
     PDA->>PDA: Xử lý lệnh, phát chuông
     PDA->>Service: POST /pda/events và device secret
     Service->>DB: Ghi nhận trạng thái, ví dụ RINGING
-    User->>Service: POST /pda/stop
+    User->>Service: POST /web/finder/requests/{id}/stop
     Service->>DB: Ghi STOPPED và thêm outbox STOP
     Worker->>FCM: Gửi STOP
     FCM-->>PDA: Dừng chuông
 ```
 
-`PdaFinderService` kiểm tra PDA thuộc cửa hàng hiện tại và có FCM token. Yêu cầu, log, outbox và audit được ghi trong cùng transaction. Sau đó `OutboxScheduler` gọi xử lý hết hạn và xử lý một sự kiện, với khoảng nghỉ 1 giây giữa các lần chạy.
+`PdaFinderService.findFromWeb()` lấy cửa hàng từ PDA trong database; web không yêu cầu login. Request và audit có requester/actor null, migration V7 hỗ trợ trường hợp này. Không bắt buộc có FCM token khi tạo yêu cầu vì PDA có thể chọn polling. Yêu cầu, log, outbox và audit được ghi trong cùng transaction. Sau đó `OutboxScheduler` gọi xử lý hết hạn và xử lý một sự kiện, với khoảng nghỉ 1 giây giữa các lần chạy.
 
 Outbox là bảng lưu việc cần gửi thông báo. Nhờ lưu cùng transaction với yêu cầu tìm, server không phải dựa vào việc controller còn đang chạy để nhớ gửi FCM. Worker dùng `FOR UPDATE SKIP LOCKED` khi lấy sự kiện; lỗi tạm thời được lên lịch thử lại. Cách này vẫn có khả năng gửi lại một lệnh nếu lần gửi trước thành công nhưng transaction chưa được ghi nhận, nên phía nhận cần xử lý theo `requestId`.
 
@@ -252,7 +252,7 @@ Outbox là bảng lưu việc cần gửi thông báo. Nhờ lưu cùng transact
 | `RINGING` | PDA đã báo trạng thái đang phát chuông |
 | `STOPPED` | Yêu cầu đã chuyển sang dừng; khi quản lý bấm dừng, backend ghi trạng thái này trước khi PDA nhận STOP |
 | `EXPIRED` | Đã quá thời hạn yêu cầu |
-| `FAILED` | Thiếu token, token không hợp lệ hoặc gặp lỗi gửi không thể tiếp tục theo chính sách hiện tại |
+| `FAILED` | Android báo thất bại khi phát chuông; lỗi gửi push không tự đóng request trước hạn |
 
 `FINDER_TIMEOUT_SECONDS` mặc định 60 giây, được service giới hạn trong khoảng 10–300 giây. FCM token bị báo `UNREGISTERED` sẽ được vô hiệu hóa. Mỗi PDA chỉ có một yêu cầu đang hoạt động nhờ unique index trong database.
 
@@ -308,7 +308,7 @@ Các nghiệp vụ theo cửa hàng như quản lý PDA, tồn kho và thanh lý
 | POST | `/auth/refresh` | Refresh token trong body |
 | POST | `/auth/register` | JWT, `MANAGER`; tạo nhân viên cùng cửa hàng |
 | GET | `/devices` | JWT, `MANAGER` |
-| POST | `/devices/register` | JWT, `MANAGER` |
+| POST | `/devices/register` | JWT, `MANAGER` hoặc `EMPLOYEE` |
 | PUT | `/devices/token` | Device ID và secret |
 | POST | `/pda/find` | JWT, `MANAGER` |
 | GET | `/pda/find/{id}` | JWT, `MANAGER` |
@@ -338,12 +338,13 @@ Payload và ví dụ chi tiết: [API contracts](../docs/07-api-contracts.md). `
 | `V4__create_product_tables.sql` | `products`, `product_image_sync_logs` |
 | `V5__create_inventory_tables.sql` | `inventories`, `inventory_adjustments`, `inventory_transactions` |
 | `V6__create_disposal_tables.sql` | `disposals`, `disposal_items`, `disposal_histories`; bổ sung khóa ngoại từ giao dịch tồn kho sang phiếu thanh lý |
+| `V7__allow_web_finder_requests.sql` | Cho phép requester_id null cho yêu cầu từ website React không đăng nhập; có trong cả hai lịch sử migration |
 
 Flyway tự chạy khi khởi động với cấu hình mặc định. V6 bổ sung khóa ngoại nói trên vì bảng `disposals` chưa tồn tại khi V5 chạy.
 
 Database mới dùng `classpath:db/migration`. Database đã chạy file `V1__retail_schema.sql` trước khi tái cấu trúc cần đặt `SPRING_FLYWAY_LOCATIONS=classpath:db/legacy`. Bản legacy giữ nguyên nội dung V1 cũ. Chọn một trong hai lịch sử, không ghép cả hai vì trùng version 1.
 
-Thay đổi schema mới cho lịch sử sáu migration dùng V7 trở đi; không sửa migration đã chạy. Lịch sử legacy cần được quản lý riêng cho đến khi có quy trình chuyển đổi rõ ràng. Không có bước tự động reset database trong lần tái cấu trúc này.
+V7 đã được bổ sung cho cả lịch sử mới và legacy; thay đổi tiếp theo dùng V8 trở đi, không sửa migration đã chạy. Không có bước tự động reset database. Website React và API công khai được mô tả trong [hướng dẫn tìm PDA trên web](../docs/21-react-device-finder.md).
 
 ## 7. Cấu hình và cách chạy
 

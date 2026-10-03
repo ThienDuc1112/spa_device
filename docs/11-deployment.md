@@ -22,7 +22,7 @@ Outputs: `pda-management/target/pda-management-1.0.0.war` and `pda-android/app/b
 
 ## First backend installation
 
-Fresh databases use the six migrations in `db/migration`. For an existing database that already applied `V1__retail_schema.sql`, set `SPRING_FLYWAY_LOCATIONS=classpath:db/legacy` in `.env` before starting this version. The legacy directory contains the unchanged original migration. Do not combine the two locations or remove Flyway history to bypass validation.
+Fresh databases use seven migrations in `db/migration`. For an existing database that already applied `V1__retail_schema.sql`, set `SPRING_FLYWAY_LOCATIONS=classpath:db/legacy` in `.env` before starting this version. The legacy directory contains the unchanged original migration plus V7, which allows anonymous web finder requesters. Do not combine the two locations or remove Flyway history to bypass validation.
 
 1. Copy `.env.example` to `.env`. Set a random database password and JWT secret. Generate the latter from 32 or more random bytes and Base64 encode it (e.g. `openssl rand -base64 32`); keep it in your secret manager. Do not reuse the test-only all-zero key.
 2. For initial provisioning only, set `APP_BOOTSTRAP_ENABLED=true` and a random `BOOTSTRAP_PASSWORD` of at least 16 characters. Bootstrap creates STORE-001 and the `admin` manager only when the user table is empty. It never overwrites existing users.
@@ -34,15 +34,23 @@ Production environments should separate the migration owner from the runtime dat
 
 ## Firebase and managed PDAs
 
-Finder also supports HTTP polling without Firebase. For background/locked-screen operation, provision the managed-device power policy and start the persistent service from Home as described in [finder polling](15-finder-polling.md). The Firebase steps below configure the additional push transport.
+Finder uses FCM by default (`finderTransport=fcm` in Android `gradle.properties`). Missing Firebase configuration or `FCM_ENABLED=false` does not enable polling. For HTTP polling without Firebase, explicitly build with `./gradlew assembleDebug -PfinderTransport=polling`, install that APK on the target PDA and open Home. For background/locked-screen operation, provision the managed-device power policy as described in [finder polling](15-finder-polling.md). Changing the property requires rebuilding/reinstalling; switching back uses `-PfinderTransport=fcm`. Backend `FCM_ENABLED` controls push sending only and remains opt-in until credentials are configured. Keep it enabled when the fleet includes FCM devices; polling APKs ignore incoming FCM finder messages.
 
 1. Create/register Android package `com.company.pda` in your Firebase project. Put its client `google-services.json` in `pda-android/app/`; it is excluded from version control. Enable FCM HTTP v1.
 2. Enable `FCM_ENABLED=true` on the backend. Prefer workload identity/application default credentials with only messaging permission. For local credentials, mount the service-account JSON read-only and set `GOOGLE_APPLICATION_CREDENTIALS` to its container path. Do not put JSON private keys in the repository or APK. The base Compose file does not mount any credential automatically.
 3. Install the APK on a Google Play services-enabled PDA, allow notifications and launch once. Force-stopped apps cannot receive normal FCM until relaunched. Validate OEM battery/device policy behavior in your fleet.
-4. A manager signs in and selects **Register this PDA** once using a unique asset code. The one-time device secret is stored encrypted on that installation. A fresh installation has no device secret; re-enrollment requires revoking/replacing the old device registration through the operator's database administration procedure. Never assign one token to multiple device records.
-5. Configure **Finder sound settings** on the target PDA and run its speaker test in silent/vibrate and the store's usual DND mode. Follow the [finder audio acceptance checks](12-finder-audio.md). Open **PDA management** on another signed-in manager device. Select the target, then refresh status. Observe QUEUED → SENT → RINGING (software playback checks passed; physical audibility must be tested). Check local Stop, remote Stop, and timeout; the previous alarm volume/mute state is restored during normal service cleanup. DND that blocks alarms must result in FAILED.
+4. An employee or manager signs in and completes the registration form shown at Home using a unique asset code. The one-time device secret is stored encrypted on that installation. A fresh installation has no device secret; re-enrollment requires revoking/replacing the old device registration through the operator's database administration procedure. Never assign one token to multiple device records.
+5. Configure **Finder sound settings** on the target PDA and run its speaker test in silent/vibrate and the store's usual DND mode. Follow the [finder audio acceptance checks](12-finder-audio.md). Open the React website (see [web setup](21-react-device-finder.md)), select the store/PDA and click **Tìm**. Status refreshes automatically. Observe QUEUED → SENT → RINGING (software playback checks passed; physical audibility must be tested). Check local Stop, website **Dừng**, and timeout; the previous alarm volume/mute state is restored during normal service cleanup. DND that blocks alarms must result in FAILED.
 
 FCM is an external delivery channel and cannot guarantee delivery to disconnected or force-stopped devices. Android policy can prevent background service starts, notifications or volume changes. The app reports failures and uses notification presentation rather than bypassing OS rules. Test these states before an operational rollout.
+
+For local Windows FCM testing, build the WAR and run `powershell -NoProfile -ExecutionPolicy Bypass -File ./pda-management/run-fcm.ps1 -CredentialPath 'C:\secrets\service-account.json'` after stopping the previous backend. This only bypasses script policy for that process. The launcher validates the Admin/client project and enables FCM/scheduler. See [troubleshooting](22-delete-device-and-finder-troubleshooting.md).
+
+## React finder website
+
+Run `npm ci` then `npm run dev` inside `pda-web` (Node.js 20+). Open http://localhost:5173; no login is required. Vite proxies `/web/finder` to localhost:8080; `pda-web/.env.local` can set `BACKEND_URL` to another origin. Build with `npm run build`. For deployment, serve `dist/` and reverse proxy `/web/finder/` to Spring Boot, preserving the path. This public API allows cross-store list/find/stop by anyone who can reach it; host it on the intended internal network. See [React guide](21-react-device-finder.md).
+
+Flyway V7 permits null finder requesters for anonymous web operations and is supplied in both migration histories. Do not change V1 or switch migration histories on an existing database. Android registration still uses a logged-in employee/manager and fixes the device's store at enrollment.
 
 ## Scanner setup
 

@@ -6,11 +6,10 @@ import android.content.pm.ServiceInfo;
 import android.os.*;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import com.company.pda.BuildConfig;
 import com.company.pda.PdaApplication;
 import com.company.pda.common.exception.ApiException;
-import com.company.pda.data.remote.dto.pdafinder.PdaFinderDto;
 import com.company.pda.presentation.home.HomeActivity;
-import java.util.List;
 import java.util.concurrent.*;
 import retrofit2.Call;
 
@@ -24,13 +23,16 @@ public final class FinderPollingService extends Service {
   private volatile Call<?> activeCall;
   private PowerManager.WakeLock wakeLock;
   private boolean started;
-  private long delaySeconds = 15;
+  private long delaySeconds = 5;
   private FinderPollingCycle cycle;
   private String cycleDeviceId, cycleSecret;
-  private long nextTokenRetry;
 
   /** Invoke from a visible activity or registration callback, never Application.onCreate. */
   public static void start(Context context) {
+    if (!"polling".equals(BuildConfig.FINDER_TRANSPORT)) {
+      context.stopService(new Intent(context, FinderPollingService.class));
+      return;
+    }
     var app = (PdaApplication) context.getApplicationContext();
     if (!app.modules().device.registered()) return;
     try {
@@ -43,6 +45,11 @@ public final class FinderPollingService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
+    // Also guard direct starts and a sticky restart after installing an FCM build.
+    if (!"polling".equals(BuildConfig.FINDER_TRANSPORT)) {
+      stopSelf();
+      return START_NOT_STICKY;
+    }
     var manager = getSystemService(NotificationManager.class);
     manager.createNotificationChannel(
         new NotificationChannel(
@@ -57,7 +64,7 @@ public final class FinderPollingService extends Service {
         new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("PDA finder is available")
-            .setContentText("Monitoring push availability; finder fallback is ready")
+            .setContentText("Receiving finder commands via polling")
             .setContentIntent(open)
             .setOngoing(true)
             .setSilent(true)
@@ -97,26 +104,10 @@ public final class FinderPollingService extends Service {
         cycleSecret = secret;
         cycle =
             new FinderPollingCycle(
-                new FinderPollingCycle.Transport() {
-                  public boolean backendFcmFailed() throws java.io.IOException {
-                    var health =
-                        execute(app.modules().finderApi.fcmHealth(Long.parseLong(id), secret));
-                    if (health == null)
-                      throw new java.io.IOException("Missing FCM health response");
-                    return health.fallbackRequired;
-                  }
-
-                  public List<PdaFinderDto.Command> commands() throws java.io.IOException {
-                    return execute(app.modules().finderApi.commands(Long.parseLong(id), secret));
-                  }
-                });
+                () -> execute(app.modules().finderApi.commands(Long.parseLong(id), secret)),
+                "polling".equals(BuildConfig.FINDER_TRANSPORT));
       }
-      long now = SystemClock.elapsedRealtime();
-      if (now >= nextTokenRetry) {
-        nextTokenRetry = now + 60_000;
-        app.modules().fcm.retryIfNeeded();
-      }
-      var commands = cycle.run(app.modules().fcm.unavailable(), now);
+      var commands = cycle.run();
       if (commands == null) throw new java.io.IOException("Missing command response");
       main.post(
           () -> {

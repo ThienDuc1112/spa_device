@@ -1,5 +1,26 @@
 # Verification results
 
+## Device deletion and finder delivery diagnosis — 2026-10-03
+
+- Read-only inspection of the running dev database found the latest web request had QUEUED/STOP_REQUESTED logs, no PUSH_FIND, and unprocessed outbox rows with attempts=0. Dev configuration disabled the scheduler. No real device/request rows were deleted or changed during diagnosis.
+- Java 8 Maven `verify`: 12 unit + 36 integration tests passed. New tests cover deletion of only the selected PDA and its finder logs/requests/outbox, retention of other devices and general audit, 409 for an active unexpired request, deletion after expiry with scheduler disabled, 404 for a missing device, rejection of old credentials, reusing asset code/token on registration, runtime configuration and latest delivery log projection.
+- Android build/unit tests/lint passed: 7 unit tests, 0 lint errors/16 warnings. Instrumentation APK includes a test that stale credential rejection cannot clear a newer registration; compiled, not run on the emulator in this change.
+- React production build and Chrome mocked-API smoke tests passed: scheduler/FCM warnings, Find/Stop, disabled delete during active request, cancel/confirm delete, correct DELETE path, refresh, error recovery and mobile layout. No real DELETE or FCM was sent.
+- The FCM PowerShell launcher parsed and rejected Android google-services.json before starting a backend. Successful Admin authentication/live FCM delivery remains unverified without a supplied service-account path. See [deletion and troubleshooting guide](22-delete-device-and-finder-troubleshooting.md).
+
+## React finder website and Android enrollment — 2026-10-03
+
+- Java 8 Maven `verify` passed: 12 unit tests and 33 integration tests. Verified both Flyway histories on isolated PostgreSQL: legacy V1 + V7, and fresh V1–V7. Public web tests cover all stores including empty stores, exclusion of device secrets/tokens, find/outbox/mock push/ACK/stop, nullable requester/system audit, duplicate 409, missing IDs 404, employee enrollment and anonymous enrollment denial. Existing manager store isolation still passes. No application database was migrated during these tests.
+- React `npm run build` passed. Chrome headless with mocked API passed grouping/filtering stores, an empty store/system, Find/Stop request paths and button states, lack of Authorization headers, API error/recovery and a mobile viewport; no browser JavaScript errors. This is separate from the backend integration tests, not a live FCM end-to-end test.
+- Android `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`, `lintDebug` passed after removing remote finder screens and prompting enrollment at Home after login. 7 unit tests passed; lint 0 errors, 16 warnings. Device instrumentation was compiled, not executed in this change; the new registration dialog and actual speaker/FCM still need device acceptance checks.
+- Android structure checker passed for 182 required paths; OpenAPI regenerated and local documentation links/whitespace checked. Run instructions and migration details: [React finder guide](21-react-device-finder.md).
+
+## Explicit finder transport, FCM by default — 2026-10-03
+
+With JDK 21 / Gradle 8.11.1, both default FCM and `-PfinderTransport=polling` passed `:app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`. Each unit-test run passed all 7 tests, including 4 transport tests covering no command HTTP in FCM mode, explicit polling without FCM health, network recovery without changing mode, and propagation of authentication errors. Lint: 0 errors, 18 warnings. An invalid transport value was rejected at Gradle configuration time. Final generated `BuildConfig.FINDER_TRANSPORT` and debug APK use `fcm`.
+
+Instrumentation tests were updated for the two build modes and compiled. Execution on the connected emulator was not completed: installing the polling APK returned `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because the installed app has a different signing key. The existing app/data were preserved; no uninstall was performed. Live FCM delivery, service lifecycle on-device and physical audio remain unverified for this change. No backend logic, dependency versions or database schema changed. Setup: [configured finder transport](16-fcm-to-polling-fallback.md).
+
 ## Finder conflict and stale expiry — 2026-10-03
 
 Java 8 `mvn verify`: **BUILD SUCCESS**, 12 unit tests and 30 integration tests passed. New checks cover replacing expired QUEUED/SENT/RINGING requests with the scheduler disabled, store isolation during expiry, expiry audit logs, skipping obsolete outbox messages, and concurrent Find calls producing exactly one request/outbox event. An unexpired duplicate returns a specific HTTP 409 message. Existing database migrations and unique indexes are unchanged; tests used an isolated embedded database.

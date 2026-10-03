@@ -7,8 +7,14 @@ All paths are relative to the HTTPS API origin. Authenticated employee calls sen
 | POST | `/auth/register` | MANAGER | RegisterUser -> RegisteredUser, HTTP 201 |
 | POST | `/auth/login` | Public, rate-limited at ingress | Login → Tokens |
 | POST | `/auth/refresh` | Refresh JWT | RefreshBody → Tokens |
+| DELETE | `/web/finder/devices/{deviceId}` | Public | 204 deleted with finder history/outbox, 404 missing, 409 active request |
+| GET | `/web/finder/configuration` | Public | fcmEnabled, schedulerEnabled |
+| GET | `/web/finder/devices` | Public | All stores/devices and latest request |
+| POST | `/web/finder/devices/{deviceId}/find` | Public | No body → FindRequest (requesterId null) |
+| GET | `/web/finder/requests/{id}` | Public | FindRequest |
+| POST | `/web/finder/requests/{id}/stop` | Public | No body → empty 200 |
 | GET | `/devices` | MANAGER | Device summary array, maximum 500 |
-| POST | `/devices/register` | MANAGER | Register → Registration |
+| POST | `/devices/register` | MANAGER / EMPLOYEE | Register → Registration |
 | PUT | `/devices/token` | Device credential | Token → empty 200 |
 | POST | `/pda/find` | MANAGER | Find → FindRequest |
 | GET | `/pda/find/{id}` | MANAGER | FindRequest |
@@ -47,22 +53,24 @@ Refresh with `{"refreshToken":"<current refresh JWT>"}`. Each refresh is single 
 
 ## Device and finder
 
+The React website uses the public `/web/finder` API: `GET /devices`, `POST /devices/{deviceId}/find`, `GET /requests/{id}`, `POST /requests/{id}/stop` relative to that prefix. No bearer token is required; all stores are visible. The list includes empty stores (`deviceId=null`), safe device metadata and latest request, never a device secret/token/hash. Web requests have `requesterId=null`; audit operations are `PDA_FIND_WEB`/`PDA_STOP_WEB`. See [website contract](21-react-device-finder.md). The manager APIs below remain for compatibility; Android no longer calls them to find other devices.
+
 ```json
 {"deviceCode":"PDA-001","deviceName":"Receiving PDA","fcmToken":"<Firebase registration token>"}
 ```
 
-Registration returns `{"deviceId":1,"deviceSecret":"<one-time random secret>"}`. Device code is unique, max 100 characters; name max 255; push token optional (polling-only registration), max 4096. Store is derived from the registering manager. Persist the device secret immediately. Updating `/devices/token` sends `{"fcmToken":"<latest token>"}` and refreshes the last-active timestamp. Last activity is observational, not proof of current reachability.
+Registration returns `{"deviceId":1,"deviceSecret":"<one-time random secret>"}`. Device code is unique, max 100 characters; name max 255; push token optional (polling-only registration), max 4096. Registration requires MANAGER or EMPLOYEE; store is derived from that authenticated account. Android prompts registration at Home after login. Persist the device secret immediately. Updating `/devices/token` sends `{"fcmToken":"<latest token>"}` and refreshes the last-active timestamp. Last activity is observational, not proof of current reachability.
 
-Find: `{"deviceId":1}` →
+Legacy manager Find (`POST /pda/find`): `{"deviceId":1}` →
 
 ```json
 {"id":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","requesterId":1,"storeId":1,"deviceId":1,"status":"QUEUED","expiresAt":"2026-09-24T12:00:00Z"}
 ```
 
 Stop: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa"}`.
-Event: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","status":"RINGING"}`. Allowed device statuses: RINGING, STOPPED, FAILED. Terminal requests cannot return to an active state. Timeout is server-configurable and clamped to 10–300 seconds. Missing/invalid push tokens and exhausted push retries leave the request available to HTTP polling until expiry. GET /pda/commands authenticates X-Device-Id and X-Device-Secret and returns unexpired commands for that device only; see [polling](15-finder-polling.md). An offline device can remain SENT without RINGING and then expire.
+Event: `{"requestId":"f827e8d8-f9a7-45ca-9a54-dc7235fe26fa","status":"RINGING"}`. Allowed device statuses: RINGING, STOPPED, FAILED. Terminal requests cannot return to an active state. Timeout is server-configurable and clamped to 10–300 seconds. Missing/invalid push tokens and exhausted push retries leave the request available to HTTP polling until expiry. Android only fetches commands when explicitly built with `finderTransport=polling`; its default `fcm` mode never switches automatically on push errors. GET /pda/commands authenticates X-Device-Id and X-Device-Secret and returns unexpired commands for that device only; see [polling](15-finder-polling.md). An offline device can remain SENT without RINGING and then expire.
 
-`GET /pda/fcm-health` uses `X-Device-Id` and `X-Device-Secret` and returns `{"fallbackRequired":false,"reason":"READY"}` with `Cache-Control: no-store`. Other reasons are `FCM_DISABLED`, `NO_TOKEN`, and `PUSH_FAILED`. State is scoped to the authenticated device/store; READY means no known transport failure, not proof of delivery. Android checks health every 15 seconds and fetches `/pda/commands` only when a local or backend FCM failure is known.
+`GET /pda/fcm-health` uses `X-Device-Id` and `X-Device-Secret` and returns `{"fallbackRequired":false,"reason":"READY"}` with `Cache-Control: no-store`. Other reasons are `FCM_DISABLED`, `NO_TOKEN`, and `PUSH_FAILED`. State is scoped to the authenticated device/store; READY means no known transport failure, not proof of delivery. This endpoint remains available for diagnostics and older clients; the current Android app does not poll health or use `fallbackRequired` to select its configured transport.
 
 ## Products and image publication
 

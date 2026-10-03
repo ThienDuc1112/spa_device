@@ -15,6 +15,24 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class FinderCommandTest {
   @Test
+  public void revokedRegistrationIsClearedWithoutDiscardingANewerRegistration() {
+    PdaApplication app = ApplicationProvider.getApplicationContext();
+    var tokens = app.modules().tokens;
+    String originalId = tokens.get("deviceId"), originalSecret = tokens.get("deviceSecret");
+    try {
+      app.modules().device.registered(123, "old-secret");
+      app.modules().device.registered(456, "new-secret");
+      assertFalse(app.modules().device.clearRegistration("123", "old-secret"));
+      assertTrue(app.modules().device.registered());
+      assertTrue(app.modules().device.clearRegistration("456", "new-secret"));
+      assertFalse(app.modules().device.registered());
+    } finally {
+      tokens.put("deviceId", originalId);
+      tokens.put("deviceSecret", originalSecret);
+    }
+  }
+
+  @Test
   public void tokenRecoveryDoesNotHideAnUnrecoveredDeliveryFailure() {
     PdaApplication app = ApplicationProvider.getApplicationContext();
     var tokens = app.modules().tokens;
@@ -38,6 +56,7 @@ public class FinderCommandTest {
 
   @Test
   public void pollingRemainsForegroundAfterActivityCloses() {
+    org.junit.Assume.assumeTrue("polling".equals(BuildConfig.FINDER_TRANSPORT));
     PdaApplication app = ApplicationProvider.getApplicationContext();
     var tokens = app.modules().tokens;
     String originalId = tokens.get("deviceId"), originalSecret = tokens.get("deviceSecret");
@@ -66,6 +85,33 @@ public class FinderCommandTest {
               app, com.company.pda.infrastructure.firebase.FinderPollingService.class));
       tokens.put("deviceId", originalId);
       tokens.put("deviceSecret", originalSecret);
+    }
+  }
+
+  @Test
+  public void fcmBuildDoesNotStartPollingEvenWithMissingToken() {
+    org.junit.Assume.assumeTrue("fcm".equals(BuildConfig.FINDER_TRANSPORT));
+    PdaApplication app = ApplicationProvider.getApplicationContext();
+    var tokens = app.modules().tokens;
+    String originalId = tokens.get("deviceId"), originalSecret = tokens.get("deviceSecret");
+    String originalToken = tokens.get("fcmToken"), originalFailure = tokens.get("fcmFailure");
+    try {
+      tokens.put("deviceId", "9223372036854775806");
+      tokens.put("deviceSecret", "polling-instrumentation-fixture");
+      tokens.put("fcmToken", null);
+      app.modules().fcm.failed("NOT_CONFIGURED");
+      try (var scenario =
+          androidx.test.core.app.ActivityScenario.launch(
+              com.company.pda.presentation.pdafinder.FinderSoundActivity.class)) {
+        scenario.onActivity(com.company.pda.infrastructure.firebase.FinderPollingService::start);
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        assertFalse(pollingForeground(app));
+      }
+    } finally {
+      tokens.put("deviceId", originalId);
+      tokens.put("deviceSecret", originalSecret);
+      tokens.put("fcmToken", originalToken);
+      tokens.put("fcmFailure", originalFailure);
     }
   }
 

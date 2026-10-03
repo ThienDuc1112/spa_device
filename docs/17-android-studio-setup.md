@@ -233,6 +233,8 @@ Bản debug có manifest cho phép HTTP để thử nghiệm. Khi build release,
 
 ## 9. Firebase có bắt buộc không?
 
+Sau đăng nhập nhân viên/quản lý, Home hiện form đăng ký PDA nếu máy chưa có credential. Nhập/xác nhận mã tài sản và tên; có thể làm sau bằng nút **Register this PDA**. Android không còn màn hình tìm thiết bị khác: chạy website React theo [hướng dẫn 21](21-react-device-finder.md), rồi bấm Tìm/Dừng trên web. **Finder sound settings** trên Android vẫn dùng để kiểm tra loa tại chỗ.
+
 Không cần cấu hình Firebase chỉ để cài Android Studio, mở dự án hoặc build app. Module app chỉ áp dụng Google Services plugin khi có file cấu hình client.
 
 Để thử push FCM thật, cần:
@@ -242,7 +244,7 @@ Không cần cấu hình Firebase chỉ để cài Android Studio, mở dự án
 - Backend bật FCM và có credential Firebase Admin phù hợp.
 - Thiết bị/system image hỗ trợ Google Play services cho luồng FCM hiện tại.
 
-Chi tiết cấu hình nằm trong [hướng dẫn triển khai](11-deployment.md). Cơ chế polling có thể hoạt động khi FCM không được cấu hình; xem [giải thích fallback FCM → polling](16-fcm-to-polling-fallback.md). Trong cấu hình dev hiện tại, scheduler backend bị tắt; cần bật theo hướng dẫn triển khai khi kiểm thử đầy đủ gửi push và xử lý hết hạn.
+Chi tiết cấu hình nằm trong [hướng dẫn triển khai](11-deployment.md). App mặc định dùng FCM; thiếu Firebase không tự bật polling. Để thử không dùng Firebase, đổi `finderTransport=polling` trong `pda-android/gradle.properties`, Gradle Sync rồi build/cài lại trên PDA đích và mở Home. Trở lại FCM bằng `finderTransport=fcm` rồi build/cài lại; xem [cấu hình FCM/polling](16-fcm-to-polling-fallback.md). Scheduler dev hiện mặc định bật; vẫn cần Firebase Admin credential và `FCM_ENABLED=true` để gửi FCM. Nếu web tìm nhưng không reo, xem [chẩn đoán và script chạy FCM](22-delete-device-and-finder-troubleshooting.md).
 
 ## 10. Tạo màn hình Java sau khi cài xong
 

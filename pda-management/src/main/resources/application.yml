@@ -28,7 +28,7 @@ management:
 app:
   jwt-secret: "rebZ2O/rhVdDbHI1E3pSFnnLodA+O8aeg4UKVUmX0q8="
   issuer: retail-pda
-  fcm-enabled: ${FCM_ENABLED:false}
+  fcm-enabled: ${FCM_ENABLED:true}
   finder-timeout-seconds: ${FINDER_TIMEOUT_SECONDS:60}
   bootstrap:
     enabled: ${APP_BOOTSTRAP_ENABLED:false}

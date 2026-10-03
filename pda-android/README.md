@@ -1,5 +1,7 @@
 # PDA Android
 
+Vietnamese setup guide: [Firebase, backend connectivity, Android permissions and PDA sound](../docs/23-firebase-and-android-sound-setup.md).
+
 The app follows the requested feature, scanner and device layout. Open **this directory** in Android Studio. The application ID remains `com.company.pda`. See [STRUCTURE.md](STRUCTURE.md) for the full source tree.
 
 | Module | Responsibility |
@@ -36,7 +38,7 @@ flowchart TD
 
 Manual dependency injection lives in `di/AppModule`; no Hilt/Dagger setup is required. Domain code has no Android, Retrofit or Room dependencies. Data repositories implement domain interfaces and map transport/cache objects into domain models. Hardware modules never depend on `app`.
 
-`LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use separate fragments and ViewModels. `HomeViewModel` retains Scan Order state across fragment changes. Finder management has its own activity/ViewModel. Firebase and alarm services live under `infrastructure`.
+`LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use separate fragments and ViewModels. `HomeViewModel` retains Scan Order state across fragment changes. Remote finder management now lives in the React website. Home prompts unregistered PDAs to register after login; local sound settings remain on Android. Firebase and alarm services live under `infrastructure`.
 
 ## Build and test
 
@@ -52,6 +54,14 @@ The app keeps Activity at 1.10.1, Lifecycle at 2.8.7, and Compose BOM at 2025.03
 ~~~
 
 On Windows, use `gradlew.bat`. Release APKs are unsigned until enterprise signing is configured.
+
+## Finder transport
+
+`finderTransport=fcm` in `gradle.properties` is the default. FCM errors, missing Firebase configuration, and backend `FCM_ENABLED=false` never start polling automatically. Configure Firebase on Android/backend and enable backend FCM and scheduler to receive push commands.
+
+To explicitly receive commands over HTTP, set `finderTransport=polling` and rebuild/reinstall on the target PDA, or run `./gradlew :app:assembleDebug -PfinderTransport=polling`. Open Home after installation. This mode polls commands every 5 seconds after successful requests and ignores incoming FCM finder messages. Rebuild/reinstall with `-PfinderTransport=fcm` to switch back. Both modes acknowledge alarms over HTTP; neither periodically checks FCM health. See [transport setup](../docs/16-fcm-to-polling-fallback.md) and [FCM-to-audio code walkthrough](../docs/20-fcm-to-pda-alarm-guide.md).
+
+Run `:app:connectedDebugAndroidTest` separately with `-PfinderTransport=fcm` and `-PfinderTransport=polling` on a test emulator to exercise each service lifecycle mode.
 
 Debug builds default to `http://10.0.2.2:8080/`, which connects the Android emulator to Spring Boot running on the development computer. Start PostgreSQL and the backend before signing in. HTTP is enabled only in debug builds.
 

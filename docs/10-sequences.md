@@ -2,20 +2,20 @@
 
 ```mermaid
 sequenceDiagram
- participant M as Manager
+ participant M as React website
  participant API as Backend
  participant DB as PostgreSQL
  participant W as Outbox worker
  participant F as FCM
  participant D as Android PDA
- M->>API: POST /pda/find
- API->>API: Validate manager and store
+ M->>API: POST /web/finder/devices/{deviceId}/find
+ API->>API: Resolve target device/store; no website login
  API->>DB: Transaction: request + outbox + audit
  API-->>M: QUEUED, deadline
  W->>DB: Claim due row (SKIP LOCKED)
  W->>F: High-priority data push with expiry
  F-->>W: Accepted / invalid token / transient failure
- W->>DB: SENT or retry; push exhaustion leaves HTTP polling available
+ W->>DB: SENT or retry; HTTP commands available to explicitly configured polling clients
  F->>D: Deliver if reachable before expiry
  D->>D: Start foreground alarm; show notification/dialog
  D->>API: Device-authenticated RINGING event

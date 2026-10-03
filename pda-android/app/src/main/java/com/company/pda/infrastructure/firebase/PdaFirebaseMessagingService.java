@@ -2,6 +2,7 @@ package com.company.pda.infrastructure.firebase;
 
 import android.os.Handler;
 import android.os.Looper;
+import com.company.pda.BuildConfig;
 import com.company.pda.PdaApplication;
 import com.google.firebase.messaging.*;
 
@@ -11,6 +12,7 @@ public class PdaFirebaseMessagingService extends FirebaseMessagingService {
   }
 
   public void onMessageReceived(RemoteMessage message) {
+    if (!"fcm".equals(BuildConfig.FINDER_TRANSPORT)) return;
     var data = message.getData();
     try {
       java.util.UUID.fromString(data.get("requestId"));

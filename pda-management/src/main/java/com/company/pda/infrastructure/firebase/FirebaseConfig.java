@@ -1,6 +1,7 @@
 package com.company.pda.infrastructure.firebase;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.firebase.*;
 import com.google.firebase.messaging.FirebaseMessaging;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,6 +15,8 @@ public class FirebaseConfig {
     return FirebaseApp.initializeApp(
         FirebaseOptions.builder()
             .setCredentials(GoogleCredentials.getApplicationDefault())
+            // Avoid the Apache HTTP/2 future blocking the outbox worker on this Java 8 runtime.
+            .setHttpTransport(new NetHttpTransport())
             .setConnectTimeout(5000)
             .setReadTimeout(5000)
             .build());

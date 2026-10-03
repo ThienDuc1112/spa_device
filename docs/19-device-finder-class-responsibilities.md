@@ -1,6 +1,6 @@
 # Vì sao luồng tìm thiết bị đi qua nhiều class?
 
-Tài liệu giải thích vai trò các class trong chức năng tìm PDA, dựa trên mã nguồn được xem ngày 30/09/2026. Các đề xuất đơn giản hóa ở cuối là đánh giá thiết kế, chưa phải thay đổi đã triển khai.
+Tài liệu giải thích vai trò các class trong chức năng tìm PDA, cập nhật theo luồng web React ngày 03/10/2026. Các đề xuất đơn giản hóa ở cuối là đánh giá thiết kế, chưa phải thay đổi đã triển khai.
 
 ## 1. Tổng quan
 
@@ -18,30 +18,31 @@ Nhấn Find ──────────────► Tạo yêu cầu
 Xem trạng thái ◄───────── Trả kết quả
 ```
 
-Ngoài FCM, PDA đích còn có đường nhận lệnh qua HTTP polling khi ghi nhận lỗi FCM. Vì vậy, đây không phải một chuỗi gọi hàm chạy liên tục trong cùng một ứng dụng.
+PDA đích mặc định nhận lệnh qua FCM. Chỉ khi build/cài APK với `finderTransport=polling` mới nhận qua HTTP; không tự chuyển theo lỗi FCM. Vì vậy, đây không phải một chuỗi gọi hàm chạy liên tục trong cùng một ứng dụng.
 
-## 2. Phía máy người dùng nhấn Find
+## 2. Website gửi lệnh và Android đăng ký
 
-| Class/interface | Làm gì? | Vì sao tách riêng? |
-|---|---|---|
-| `PdaFinderActivity` | Hiển thị danh sách, nhận thao tác Find/Stop/Refresh. | Giữ phần giao diện và vòng đời màn hình ở một chỗ. |
-| `PdaFinderViewModel` | Xử lý thao tác, gọi repository và cập nhật trạng thái màn hình. | Activity không phải tự quản lý việc tải dữ liệu và kết quả. |
-| `AsyncViewModel` | Cung cấp cơ chế chạy công việc nền rồi cập nhật UI. | Dùng chung cách xử lý tác vụ bất đồng bộ cho nhiều màn hình. |
-| `PdaFinderUiState` | Chứa danh sách thiết bị và yêu cầu tìm hiện tại. | Gom dữ liệu hiển thị thành một trạng thái rõ ràng. Đây là dữ liệu, không phải một bước xử lý. |
-| `PdaFinderRepository` | Khai báo các thao tác tìm, dừng, đăng ký và điều khiển chuông cục bộ. | Bên gọi phụ thuộc hợp đồng, có thể thay implementation hoặc dùng bản giả khi test. |
-| `PdaFinderRepositoryImpl` | Gọi API, chuyển DTO thành model, chuyển lệnh chuông cục bộ tới `AlarmController`. | Che giấu chi tiết lấy dữ liệu và gọi hạ tầng khỏi ViewModel. |
-| `PdaFinderApi` | Khai báo endpoint HTTP bằng Retrofit. | Tập trung đường dẫn, body và header của API. |
+| Thành phần | Trách nhiệm |
+| --- | --- |
+| React `App` trong [main.jsx](../pda-web/src/main.jsx) | Nhóm thiết bị theo cửa hàng, lọc, gửi Tìm/Dừng, refresh trạng thái, hiện lỗi. |
+| `api()` trong React | Gọi nhóm API `/web/finder` bằng fetch; không có token hoặc màn hình login. |
+| `vite.config.js` | Proxy dev/preview tới Spring Boot; bản deploy tĩnh dùng reverse proxy. |
+| Android `HomeActivity/HomeViewModel` | Sau login mở form đăng ký nếu chưa có credential; giữ nút đăng ký lại khi bỏ qua. |
+| `PdaFinderRepositoryImpl` | Gọi API đăng ký, lưu credential và chuyển lệnh âm thanh cục bộ tới AlarmController. Không còn tìm/dừng PDA khác. |
+| `PdaFinderApi` | API đăng ký, đồng bộ token, nhận lệnh và ACK của PDA. |
 
-Trong [PdaFinderViewModel.java](../pda-android/app/src/main/java/com/company/pda/presentation/pdafinder/PdaFinderViewModel.java), `find()` gọi trực tiếp repository. Nó không đi qua `StartPdaAlarmUseCase`; use case đó thuộc luồng bật chuông trên PDA đích.
+Đã bỏ `PdaFinderActivity/PdaFinderViewModel/PdaFinderUiState` và layout tương ứng. Website gửi yêu cầu; `StartPdaAlarmUseCase` chỉ thuộc Android nhận lệnh. Xem [hướng dẫn React](21-react-device-finder.md).
 
 ## 3. Backend tiếp nhận và lưu yêu cầu
 
 | Class/interface | Làm gì? | Vì sao tách riêng? |
 |---|---|---|
+| `WebFinderController` | API công khai xem toàn hệ thống và tìm/dừng từ React. | Tách endpoint web khỏi các API credential/JWT hiện có. |
+| `WebFinderQueries` / `WebFinderMapper` | Đọc cửa hàng, thiết bị và request gần nhất, không trả secret/token. | Projection riêng cho màn hình web. |
 | `PdaFinderController` | Nhận HTTP, kiểm tra dữ liệu đầu vào, yêu cầu quyền manager ở các endpoint quản lý. | Tách giao thức HTTP khỏi xử lý nghiệp vụ. |
 | `FinderUseCase` | Hợp đồng các chức năng finder mà controller sử dụng. | Controller không phụ thuộc trực tiếp class service cụ thể. Đây là interface, không phải thêm một đối tượng trung gian thực thi. |
 | `PdaFinderService` | Kiểm tra thiết bị thuộc cửa hàng, tạo request/deadline, ghi log, đưa lệnh vào outbox, xử lý stop và trạng thái. | Là nơi điều phối nghiệp vụ và transaction. |
-| `CurrentActor` | Cung cấp người dùng và cửa hàng hiện tại. | Service không phải đọc trực tiếp chi tiết Spring Security. |
+| `CurrentActor` | Cung cấp user/store cho đăng ký và API manager cũ; web finder không có actor. | Không giả mạo tài khoản cho yêu cầu công khai. |
 | `DeviceRepository` | Tra cứu thiết bị, token và cập nhật thông tin liên quan. | Tách truy cập dữ liệu thiết bị khỏi nghiệp vụ finder. |
 | `DeviceUseCase` / `DeviceService` | Xác thực thiết bị bằng ID và secret khi thiết bị lấy lệnh hoặc gửi kết quả. | Dùng chung quy tắc nhận diện thiết bị. |
 | `PdaFindRepository` | Hợp đồng lưu và đọc yêu cầu tìm, trạng thái, log. | Nghiệp vụ không gắn trực tiếp với MyBatis. |
@@ -70,8 +71,8 @@ Các class như `FindPdaRequest`, `FindPdaCommand`, `FindPdaResult`, `FindPdaRes
 | Class/interface | Làm gì? | Vì sao tách riêng? |
 |---|---|---|
 | `PdaFirebaseMessagingService` | Nhận message FCM. | Là điểm tiếp nhận của Firebase trên Android. |
-| `FinderPollingService` | Duy trì đường kiểm tra và lấy lệnh qua HTTP. | Có vòng đời và lịch chạy nền riêng, độc lập với một phiên chuông. |
-| `FinderPollingCycle` | Quyết định lấy lệnh hay chỉ kiểm tra health, điều chỉnh khoảng chờ. | Tách quyết định polling khỏi Android Service để dễ kiểm thử. |
+| `FinderPollingService` | Chỉ chạy khi cấu hình `polling`; nhận lệnh HTTP, backoff khi lỗi, không kiểm tra FCM health. | Có vòng đời và lịch chạy nền riêng, độc lập với một phiên chuông. |
+| `FinderPollingCycle` | Chỉ gọi commands khi được bật bằng cấu hình; nhịp thành công 5 giây. | Tách việc lấy lệnh khỏi Android Service để kiểm thử không có HTTP khi tắt polling. |
 | `FinderCommandHandler` | Xử lý FIND/STOP; kiểm tra UUID, deadline, lệnh đã xử lý và phiên đang chạy. | FCM và polling dùng cùng quy tắc, tránh xử lý khác nhau hoặc bật chuông trùng. |
 | `StartPdaAlarmUseCase` | Chuyển yêu cầu bật chuông tới repository. | Thể hiện thao tác ở tầng domain; hiện chưa có logic riêng đáng kể. |
 | `StopPdaAlarmUseCase` | Chuyển yêu cầu dừng chuông tới repository. | Tương tự use case bật chuông. |
@@ -109,7 +110,7 @@ Các interface `AlarmPlayer`, `VolumeController`, `AudioModeController` còn cho
 |---|---|---|
 | `PendingEvent` cùng lớp truy cập Room | Lưu sự kiện chờ gửi như `RINGING`, `STOPPED`, `FAILED`. | Giữ sự kiện đã lưu khi mạng tạm thời không dùng được. |
 | `SyncWorker` | Gửi sự kiện và cập nhật token; thử lại khi lỗi có thể phục hồi. | Việc đồng bộ không phụ thuộc phiên chuông còn chạy hay không. |
-| `PdaFinderViewModel` | Khi người dùng Refresh, lấy trạng thái từ backend để hiển thị. | Trạng thái trên máy người tìm được cập nhật qua server. |
+| React `App` | Đọc danh sách và request gần nhất mỗi khoảng 5 giây hoặc khi bấm Làm mới. | Website hiển thị ACK Android đã gửi lên server. |
 
 ## 8. Đánh giá mức độ cần thiết
 
@@ -137,5 +138,5 @@ Riêng `PdaFinderRepositoryImpl` đang gánh cả gọi API từ xa và điều 
 ## 9. Tài liệu liên quan
 
 - [Luồng hoạt động tìm thiết bị PDA](14-device-finder-flow.md).
-- [Polling dự phòng cho PDA finder](15-finder-polling.md).
+- [Polling theo cấu hình cho PDA finder](15-finder-polling.md).
 - [Finder audio and silent mode](12-finder-audio.md).

@@ -64,7 +64,7 @@ erDiagram
   uuid id PK
   bigint device_id FK
   bigint store_id FK
-  bigint requester_id FK
+  bigint requester_id FK "nullable for web requests"
   varchar status
   timestamptz expires_at
  }
@@ -146,6 +146,6 @@ erDiagram
  }
 ```
 
-The authoritative schema is defined by V1 through V6 in `pda-management/src/main/resources/db/migration/`. The former single V1 is retained under `db/legacy` for existing databases; see the backend README for selecting the migration history. All timestamps use UTC-capable `TIMESTAMPTZ`. Quantities use `NUMERIC(18,2)` and Java `BigDecimal`. Composite foreign keys prevent cross-store user/device associations. Stock is unique per `(store_id, product_id)`; disposal products are unique per header. A partial unique index permits only one active finder request per PDA.
+The authoritative schema is defined by V1 through V7 in `pda-management/src/main/resources/db/migration/`. The former single V1 is retained under `db/legacy` for existing databases; see the backend README for selecting the migration history. All timestamps use UTC-capable `TIMESTAMPTZ`. Quantities use `NUMERIC(18,2)` and Java `BigDecimal`. Composite foreign keys prevent cross-store user/device associations. Stock is unique per `(store_id, product_id)`; disposal products are unique per header. A partial unique index permits only one active finder request per PDA. V7 permits null requester_id for public web requests; the user/store FK still validates non-null requesters. V7 is included in the legacy history as well.
 
 The ledger checks `before + change = after`, nonnegative stock and the correct reference type. Completed financial/stock history is retained instead of cascading deletes. The outbox deliberately holds an opaque aggregate ID; business creation and enqueue occur within one transaction. Database numeric constraints complement API precision validation.

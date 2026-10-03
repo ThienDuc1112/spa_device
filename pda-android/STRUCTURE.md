@@ -135,9 +135,6 @@ pda-android/
 |   |   |   |               |   |   `-- InventoryViewModel.java
 |   |   |   |               |   |-- pdafinder/
 |   |   |   |               |   |   |-- FinderSoundActivity.java
-|   |   |   |               |   |   |-- PdaFinderActivity.java
-|   |   |   |               |   |   |-- PdaFinderUiState.java
-|   |   |   |               |   |   `-- PdaFinderViewModel.java
 |   |   |   |               |   |-- product/
 |   |   |   |               |   |   |-- ProductFragment.java
 |   |   |   |               |   |   |-- ProductImageViewerFragment.java
@@ -154,7 +151,6 @@ pda-android/
 |   |   |   |   |-- layout/
 |   |   |   |   |   |-- activity_home.xml
 |   |   |   |   |   |-- activity_login.xml
-|   |   |   |   |   `-- activity_pda_finder.xml
 |   |   |   |   |-- raw/
 |   |   |   |   |   `-- pda_alarm.mp3
 |   |   |   |   |-- values/

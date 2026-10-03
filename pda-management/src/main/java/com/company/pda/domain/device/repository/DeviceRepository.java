@@ -3,6 +3,12 @@ package com.company.pda.domain.device.repository;
 import com.company.pda.domain.device.model.Device;
 
 public interface DeviceRepository {
+  Device lock(long id);
+
+  boolean hasActiveFinder(long id);
+
+  void delete(long id);
+
   Device find(long id, long storeId);
 
   Device identity(long id);

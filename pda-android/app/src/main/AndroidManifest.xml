@@ -35,9 +35,6 @@
             android:exported="false"
             android:launchMode="singleTop" />
         <activity
-            android:name=".presentation.pdafinder.PdaFinderActivity"
-            android:exported="false" />
-        <activity
             android:name=".presentation.pdafinder.FinderSoundActivity"
             android:exported="false" />
 
@@ -58,7 +55,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Continuous device-finder command reception on enterprise-managed PDAs when push delivery is unavailable, including locked-screen operation" />
+                android:value="Continuous device-finder command reception on enterprise-managed PDAs explicitly configured for HTTP polling, including locked-screen operation" />
         </service>
 
         <meta-data

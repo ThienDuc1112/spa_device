@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.pda.infrastructure.persistence.mybatis.mapper.WebFinderMapper">
+  <select id="devices" resultType="com.company.pda.application.pdafinder.dto.WebDeviceRow">
+    SELECT s.id AS store_id,s.store_code,s.store_name,
+           d.id AS device_id,d.device_code,d.device_name,d.last_active_at,
+           (d.fcm_token IS NOT NULL) AS has_push_token,
+           r.id AS request_id,r.status,r.expires_at,
+           log.event AS last_event,log.message AS last_event_message
+    FROM stores s
+    LEFT JOIN devices d ON d.store_id=s.id
+    LEFT JOIN LATERAL (
+      SELECT id,status,expires_at FROM pda_find_requests
+      WHERE device_id=d.id AND store_id=s.id ORDER BY created_at DESC,id DESC LIMIT 1
+    ) r ON true
+    LEFT JOIN LATERAL (
+      SELECT event,message FROM pda_alert_logs WHERE request_id=r.id ORDER BY id DESC LIMIT 1
+    ) log ON true
+    ORDER BY s.store_code,s.id,d.device_code,d.id
+  </select>
+</mapper>

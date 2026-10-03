@@ -13,7 +13,6 @@ import com.company.pda.common.util.*;
 import com.company.pda.databinding.ActivityHomeBinding;
 import com.company.pda.presentation.disposal.DisposalFragment;
 import com.company.pda.presentation.inventory.InventoryFragment;
-import com.company.pda.presentation.pdafinder.PdaFinderActivity;
 import com.company.pda.presentation.product.*;
 import com.company.pda.presentation.scanner.ScannerViewModel;
 import com.company.scanner.api.ScannerConfig;
@@ -26,6 +25,8 @@ public class HomeActivity extends AlarmAwareActivity {
   @Override
   public void onResume() {
     super.onResume();
+    ((com.company.pda.PdaApplication) getApplication()).modules().fcm.retryIfNeeded();
+    if (vm != null) vm.checkRegistration();
     com.company.pda.infrastructure.firebase.FinderPollingService.start(this);
   }
 
@@ -45,7 +46,6 @@ public class HomeActivity extends AlarmAwareActivity {
     var ui = new ScreenViews(binding.content);
     ui.button("Scan Order", () -> vm.navigate("product"));
     ui.button("Disposal inquiry", () -> vm.navigate("disposal"));
-    ui.button("PDA management", () -> startActivity(new Intent(this, PdaFinderActivity.class)));
     ui.button("Register this PDA", this::register);
     ui.button(
         "Finder sound settings",
@@ -77,6 +77,14 @@ public class HomeActivity extends AlarmAwareActivity {
                 if (!allowed) vm.status.setValue("Allow notifications to see finder alerts");
               })
           .launch(Manifest.permission.POST_NOTIFICATIONS);
+    vm.registrationRequired.observe(
+        this,
+        required -> {
+          if (Boolean.TRUE.equals(required)) {
+            vm.registrationRequired.setValue(false);
+            register();
+          }
+        });
   }
 
   private void navigate(String screen) {
@@ -116,10 +124,11 @@ public class HomeActivity extends AlarmAwareActivity {
     }
     var box = ScreenViews.column(this);
     var ui = new ScreenViews(box);
-    var code = ui.input("Unique asset code", "", 1);
-    var name = ui.input("Device name", "", 1);
+    ui.text("Register this PDA in your account's store so it appears on the finder website.", 14);
+    var code = ui.input("Unique asset code", vm.suggestedDeviceCode(), 1);
+    var name = ui.input("Device name", Build.MANUFACTURER + " " + Build.MODEL, 1);
     new AlertDialog.Builder(this)
-        .setTitle("Register this PDA (manager)")
+        .setTitle("Register this PDA")
         .setView(box)
         .setNegativeButton("Back", null)
         .setPositiveButton(

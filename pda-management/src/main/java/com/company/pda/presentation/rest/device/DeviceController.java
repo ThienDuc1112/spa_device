@@ -18,7 +18,7 @@ public class DeviceController {
   }
 
   @PostMapping("/register")
-  @PreAuthorize("hasRole('MANAGER')")
+  @PreAuthorize("hasAnyRole('MANAGER', 'EMPLOYEE')")
   public DeviceRegistrationResult register(@Valid @RequestBody RegisterDeviceRequest body) {
     return service.register(body.toCommand());
   }

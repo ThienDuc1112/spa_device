@@ -22,6 +22,11 @@ public class MyBatisPdaFindRepository implements PdaFindRepository {
   }
 
   @Override
+  public PdaFindRequest findAny(UUID id) {
+    return PdaFindRequestEntityMapper.toDomain(mapper.findAny(id));
+  }
+
+  @Override
   public java.util.List<PdaFindRequest> commands(long deviceId, long storeId) {
     return mapper.commands(deviceId, storeId).stream()
         .map(PdaFindRequestEntityMapper::toDomain)
@@ -41,7 +46,7 @@ public class MyBatisPdaFindRepository implements PdaFindRepository {
   }
 
   @Override
-  public int create(UUID id, long actorId, long storeId, long deviceId, Instant expiresAt) {
+  public int create(UUID id, Long actorId, long storeId, long deviceId, Instant expiresAt) {
     return mapper.create(id, actorId, storeId, deviceId, expiresAt);
   }
 

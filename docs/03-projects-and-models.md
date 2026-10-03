@@ -26,7 +26,7 @@ Every module has its own Gradle configuration. API modules are plain Java librar
 
 # 5. Flyway SQL
 
-Flyway runs automatically on backend startup. Six feature migrations (V1 through V6) define the 15 requested tables plus refresh sessions, durable outbox events and general audit records. Add subsequent changes as V7 and later; never edit an applied migration. Existing databases using the original single V1 select the preserved `db/legacy` history as described in the backend README. No passwords, inventory or product fixtures are inserted into production migrations. Integration tests insert isolated fixtures after migration.
+Flyway runs automatically on backend startup. The six initial feature migrations (V1 through V6) define the 15 requested tables plus refresh sessions, durable outbox events and general audit records. V7 allows anonymous website finder requests by making requester_id nullable, in both fresh and legacy histories. Add subsequent changes as V8 and later; never edit an applied migration. Existing databases using the original single V1 select the preserved `db/legacy` history as described in the backend README. No passwords, inventory or product fixtures are inserted into production migrations. Integration tests insert isolated fixtures after migration.
 
 # 6. Entity models
 

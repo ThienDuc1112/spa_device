@@ -4,6 +4,11 @@ plugins {
 }
 if (file('google-services.json').exists()) { apply plugin: 'com.google.gms.google-services' }
 
+def finderTransport = project.hasProperty('finderTransport') ? project.property('finderTransport') : 'fcm'
+if (!(finderTransport in ['fcm', 'polling'])) {
+    throw new GradleException('finderTransport must be fcm or polling')
+}
+
 android {
     namespace 'com.company.pda'
     compileSdk 35
@@ -13,6 +18,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '1.0'
+        buildConfigField 'String', 'FINDER_TRANSPORT', '"' + finderTransport + '"'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         buildConfigField 'String', 'API_URL', '"' + (project.findProperty('apiUrl') ?: 'http://10.0.2.2:8080/') + '"'
     }

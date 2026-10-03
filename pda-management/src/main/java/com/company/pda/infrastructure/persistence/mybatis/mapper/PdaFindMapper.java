@@ -6,6 +6,8 @@ import java.util.UUID;
 import org.apache.ibatis.annotations.Param;
 
 public interface PdaFindMapper {
+  PdaFindRequestEntity findAny(UUID id);
+
   String lastPushEvent(@Param("deviceId") long deviceId, @Param("storeId") long storeId);
 
   java.util.List<PdaFindRequestEntity> commands(
@@ -18,7 +20,7 @@ public interface PdaFindMapper {
 
   int create(
       @Param("id") UUID id,
-      @Param("actorId") long actorId,
+      @Param("actorId") Long actorId,
       @Param("storeId") long storeId,
       @Param("deviceId") long deviceId,
       @Param("expiresAt") Instant expiresAt);

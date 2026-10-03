@@ -54,6 +54,7 @@ public class SecurityConfig {
             a ->
                 a.antMatchers(
                         "/auth/login",
+                        "/web/finder/**",
                         "/auth/refresh",
                         "/actuator/health",
                         "/devices/token",

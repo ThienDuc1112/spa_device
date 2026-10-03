@@ -36,7 +36,7 @@ public final class FinderCommandHandler {
       new StartPdaAlarmUseCase(app.modules().finder).execute(id, expiry);
     } catch (RuntimeException e) {
       PdaAlarmService.notifyFallback(app, id);
-      // Keep the polling path open until starting becomes possible or the request expires.
+      // Do not mark handled: a later delivery in the configured transport may retry before expiry.
     }
   }
 }

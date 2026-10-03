@@ -277,6 +277,213 @@ class StoreFlowsIT {
   }
 
   @Test
+  void websiteDeletesDeviceHistoryAndAllowsFreshRegistration() throws Exception {
+    lombok.val device = register();
+    long deviceId = device.get("deviceId").asLong();
+    lombok.val otherDevice =
+        body(
+            postJson(
+                    "/devices/register",
+                    other,
+                    mapOf(
+                        "deviceCode",
+                        "KEEP",
+                        "deviceName",
+                        "Other store",
+                        "fcmToken",
+                        "keep-token"))
+                .andExpect(status().isOk())
+                .andReturn());
+    lombok.val request =
+        body(
+            mvc.perform(post("/web/finder/devices/" + deviceId + "/find"))
+                .andExpect(status().isOk())
+                .andReturn());
+    String requestId = request.get("id").asText();
+    mvc.perform(delete("/web/finder/devices/" + deviceId)).andExpect(status().isConflict());
+    assertEquals(
+        1,
+        db.queryForObject(
+            "SELECT count(*) FROM pda_find_requests WHERE device_id=?", Integer.class, deviceId));
+    mvc.perform(post("/web/finder/requests/" + requestId + "/stop")).andExpect(status().isOk());
+    mvc.perform(delete("/web/finder/devices/" + deviceId)).andExpect(status().isNoContent());
+    for (String table : Arrays.asList("pda_alert_logs", "pda_find_requests"))
+      assertEquals(
+          0,
+          db.queryForObject(
+              "SELECT count(*) FROM " + table + " WHERE device_id=?", Integer.class, deviceId));
+    assertEquals(
+        0,
+        db.queryForObject(
+            "SELECT count(*) FROM outbox_events WHERE aggregate_id=?", Integer.class, requestId));
+    assertEquals(
+        1,
+        db.queryForObject(
+            "SELECT count(*) FROM devices WHERE id=?",
+            Integer.class,
+            otherDevice.get("deviceId").asLong()));
+    assertEquals(
+        1,
+        db.queryForObject(
+            "SELECT count(*) FROM audit_logs WHERE operation='DEVICE_DELETE_WEB' AND reference=?"
+                + " AND store_id=1 AND actor_id IS NULL",
+            Integer.class,
+            Long.toString(deviceId)));
+    mvc.perform(delete("/web/finder/devices/" + deviceId)).andExpect(status().isNotFound());
+    mvc.perform(
+            get("/pda/fcm-health")
+                .header("X-Device-Id", deviceId)
+                .header("X-Device-Secret", device.get("deviceSecret").asText()))
+        .andExpect(status().isUnauthorized());
+    assertNotEquals(deviceId, register().get("deviceId").asLong());
+  }
+
+  @Test
+  void deletionAllowsExpiredRequestWithSchedulerDisabled() throws Exception {
+    long deviceId = register().get("deviceId").asLong();
+    mvc.perform(post("/web/finder/devices/" + deviceId + "/find")).andExpect(status().isOk());
+    db.update(
+        "UPDATE pda_find_requests SET expires_at=now()-interval '1 second' WHERE device_id=?",
+        deviceId);
+    mvc.perform(delete("/web/finder/devices/" + deviceId)).andExpect(status().isNoContent());
+    assertEquals(
+        0, db.queryForObject("SELECT count(*) FROM devices WHERE id=?", Integer.class, deviceId));
+  }
+
+  @Test
+  void websiteShowsActualDeliveryConfigurationAndLatestLog() throws Exception {
+    mvc.perform(get("/web/finder/configuration"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("fcmEnabled").value(false))
+        .andExpect(jsonPath("schedulerEnabled").value(false));
+    long deviceId = register().get("deviceId").asLong();
+    mvc.perform(post("/web/finder/devices/" + deviceId + "/find")).andExpect(status().isOk());
+    mvc.perform(get("/web/finder/devices"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].lastEvent").value("QUEUED"));
+    doThrow(new IllegalStateException("FCM unavailable"))
+        .when(push)
+        .send(any(), any(), any(), any());
+    worker.processOne();
+    mvc.perform(get("/web/finder/devices"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].lastEvent").value("RETRY"))
+        .andExpect(jsonPath("$[0].lastEventMessage").value("Push unavailable"));
+  }
+
+  @Test
+  void publicWebsiteListsEveryStoreWithoutDeviceSecrets() throws Exception {
+    register();
+    postJson(
+            "/devices/register",
+            other,
+            mapOf("deviceCode", "PDA2", "deviceName", "Second PDA", "fcmToken", "second-token"))
+        .andExpect(status().isOk());
+    db.update("INSERT INTO stores(id,store_code,store_name) VALUES(3,'S3','Empty store')");
+    lombok.val result =
+        mvc.perform(get("/web/finder/devices"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].storeCode").value("S1"))
+            .andExpect(jsonPath("$[1].storeCode").value("S2"))
+            .andExpect(jsonPath("$[2].deviceId").isEmpty())
+            .andReturn();
+    String payload = result.getResponse().getContentAsString();
+    assertFalse(payload.contains("test-token"));
+    assertFalse(payload.contains("second-token"));
+    assertFalse(payload.contains("credentialHash"));
+    assertFalse(payload.contains("deviceSecret"));
+    mvc.perform(get("/devices")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void websiteFindStopUsesRealStoreOutboxAndAnonymousAudit() throws Exception {
+    lombok.val device =
+        body(
+            postJson(
+                    "/devices/register",
+                    other,
+                    mapOf(
+                        "deviceCode",
+                        "PDA2",
+                        "deviceName",
+                        "Second PDA",
+                        "fcmToken",
+                        "second-token"))
+                .andExpect(status().isOk())
+                .andReturn());
+    long id = device.get("deviceId").asLong();
+    lombok.val request =
+        body(
+            mvc.perform(post("/web/finder/devices/" + id + "/find"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("storeId").value(2))
+                .andExpect(jsonPath("requesterId").isEmpty())
+                .andReturn());
+    String requestId = request.get("id").asText();
+    mvc.perform(post("/web/finder/devices/" + id + "/find")).andExpect(status().isConflict());
+    worker.processOne();
+    verify(push).send(eq("second-token"), eq("FIND"), eq(UUID.fromString(requestId)), any());
+    mvc.perform(get("/web/finder/requests/" + requestId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("status").value("SENT"));
+    postJson("/pda/events", "", mapOf("requestId", requestId, "status", "RINGING"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post("/pda/events")
+                .header("X-Device-Id", id)
+                .header("X-Device-Secret", device.get("deviceSecret").asText())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(mapOf("requestId", requestId, "status", "RINGING"))))
+        .andExpect(status().isOk());
+    mvc.perform(post("/web/finder/requests/" + requestId + "/stop")).andExpect(status().isOk());
+    mvc.perform(post("/web/finder/requests/" + requestId + "/stop")).andExpect(status().isOk());
+    worker.processOne();
+    verify(push).send(eq("second-token"), eq("STOP"), eq(UUID.fromString(requestId)), any());
+    mvc.perform(get("/web/finder/devices"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[1].status").value("STOPPED"));
+    assertEquals(
+        2,
+        db.queryForObject(
+            "SELECT count(*) FROM audit_logs WHERE actor_id IS NULL AND store_id=2 AND operation IN"
+                + " ('PDA_FIND_WEB','PDA_STOP_WEB')",
+            Integer.class));
+    mvc.perform(get("/pda/find/" + requestId).header("Authorization", "Bearer " + manager))
+        .andExpect(status().isNotFound());
+    mvc.perform(post("/web/finder/devices/999999/find")).andExpect(status().isNotFound());
+    mvc.perform(post("/web/finder/requests/" + UUID.randomUUID() + "/stop"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void employeeCanRegisterOwnPdaAfterLoginButAnonymousCannot() throws Exception {
+    lombok.val command = mapOf("deviceCode", "EMPLOYEE-PDA", "deviceName", "Employee PDA");
+    postJson("/devices/register", "", command).andExpect(status().isUnauthorized());
+    lombok.val registration =
+        body(
+            postJson("/devices/register", employee, command)
+                .andExpect(status().isOk())
+                .andReturn());
+    assertEquals(
+        1L,
+        db.queryForObject(
+            "SELECT store_id FROM devices WHERE id=?",
+            Long.class,
+            registration.get("deviceId").asLong()));
+    assertEquals(
+        2L,
+        db.queryForObject(
+            "SELECT registered_by FROM devices WHERE id=?",
+            Long.class,
+            registration.get("deviceId").asLong()));
+    postJson("/devices/register", employee, command).andExpect(status().isConflict());
+  }
+
+  @Test
   void fcmHealthAuthenticatesDeviceAndTracksLatestPushResultOnly() throws Exception {
     lombok.val device = register();
     long id = device.get("deviceId").asLong();

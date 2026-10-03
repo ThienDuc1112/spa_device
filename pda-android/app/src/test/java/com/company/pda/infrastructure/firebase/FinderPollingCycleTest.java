@@ -10,77 +10,52 @@ import org.junit.Test;
 
 public class FinderPollingCycleTest {
   private static class Server implements FinderPollingCycle.Transport {
-    boolean failed;
-    IOException healthError;
-    int healthCalls, commandCalls;
+    IOException error;
+    int commandCalls;
 
-    public boolean backendFcmFailed() throws IOException {
-      healthCalls++;
-      if (healthError != null) throw healthError;
-      return failed;
-    }
-
-    public List<Command> commands() {
+    public List<Command> commands() throws IOException {
       commandCalls++;
+      if (error != null) throw error;
       return List.of(new Command());
     }
   }
 
   @Test
-  public void healthyPushNeverFetchesCommandsAndFailureThenRecoverySwitchesTransport()
-      throws Exception {
+  public void fcmModeNeverContactsCommandEndpoint() throws Exception {
     var server = new Server();
-    var cycle = new FinderPollingCycle(server);
-    assertTrue(cycle.run(false, 0).isEmpty());
-    cycle.run(false, 15_000);
+    server.error = new IOException("offline");
+    var cycle = new FinderPollingCycle(server, false);
+    assertTrue(cycle.run().isEmpty());
+    assertTrue(cycle.run().isEmpty());
     assertEquals(0, server.commandCalls);
-    assertEquals(15, cycle.delaySeconds());
-    server.failed = true;
-    assertEquals(1, cycle.run(false, 30_000).size());
-    cycle.run(false, 35_000);
-    cycle.run(false, 40_000);
-    assertEquals(3, server.commandCalls);
-    assertEquals(3, server.healthCalls);
+  }
+
+  @Test
+  public void explicitPollingFetchesEveryCycleWithoutFcmHealth() throws Exception {
+    var server = new Server();
+    var cycle = new FinderPollingCycle(server, true);
+    assertEquals(1, cycle.run().size());
+    assertEquals(1, cycle.run().size());
+    assertEquals(2, server.commandCalls);
     assertEquals(5, cycle.delaySeconds());
-    server.failed = false;
-    assertTrue(cycle.run(false, 45_000).isEmpty());
-    assertEquals(3, server.commandCalls);
-    assertEquals(15, cycle.delaySeconds());
   }
 
   @Test
-  public void localTokenFailureEnablesPollingEvenWhenBackendReportsHealthy() throws Exception {
+  public void networkFailureDoesNotChangeConfiguredTransport() throws Exception {
     var server = new Server();
-    var cycle = new FinderPollingCycle(server);
-    cycle.run(true, 0);
-    cycle.run(true, 5_000);
-    assertEquals(2, server.commandCalls);
-    assertTrue(cycle.run(false, 10_000).isEmpty());
+    var cycle = new FinderPollingCycle(server, true);
+    server.error = new IOException("offline");
+    assertThrows(IOException.class, cycle::run);
+    server.error = null;
+    assertEquals(1, cycle.run().size());
     assertEquals(2, server.commandCalls);
   }
 
   @Test
-  public void healthNetworkFailureDoesNotEnablePollingButPreservesKnownFcmFailure()
-      throws Exception {
+  public void authenticationFailureIsPropagatedSoServiceCanStop() {
     var server = new Server();
-    var cycle = new FinderPollingCycle(server);
-    server.healthError = new IOException("offline");
-    assertThrows(IOException.class, () -> cycle.run(false, 0));
-    assertEquals(0, server.commandCalls);
-    server.healthError = null;
-    server.failed = true;
-    cycle.run(false, 15_000);
-    server.healthError = new IOException("offline");
-    cycle.run(false, 30_000);
-    assertEquals(2, server.commandCalls);
-  }
-
-  @Test
-  public void authenticationFailureNeverFetchesCommandsEvenWithLocalFcmFailure() {
-    var server = new Server();
-    server.healthError = new ApiException(401, "Revoked credential");
-    var cycle = new FinderPollingCycle(server);
-    assertThrows(ApiException.class, () -> cycle.run(true, 0));
-    assertEquals(0, server.commandCalls);
+    server.error = new ApiException(401, "Revoked credential");
+    var cycle = new FinderPollingCycle(server, true);
+    assertSame(server.error, assertThrows(ApiException.class, cycle::run));
   }
 }
