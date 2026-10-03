@@ -1,0 +1,24 @@
+:root { font-family: system-ui, sans-serif; color: #172b40; background: #f3f5f8; }
+body { margin: 0; }
+main { max-width: 1150px; margin: 32px auto; padding: 0 20px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 { margin-bottom: 6px; font-size: 28px; }
+h2 { font-size: 19px; margin-top: 0; }
+section { background: white; padding: 22px; margin: 24px 0; border: 1px solid #dce2e9; border-radius: 10px; }
+button, select { font: inherit; padding: 9px 14px; border: 1px solid #bdc9d5; border-radius: 6px; }
+button { background: #145ca4; color: white; cursor: pointer; }
+button:disabled { background: #e4e8ed; color: #687585; cursor: default; }
+button:focus-visible, select:focus-visible { outline: 3px solid #edb82e; outline-offset: 2px; }
+select { margin-left: 8px; max-width: 100%; background: white; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: 13px 10px; border-bottom: 1px solid #e8ecf0; }
+th { font-size: 13px; color: #526274; }
+small { display: block; color: #526274; margin-top: 5px; overflow-wrap: anywhere; }
+.actions { white-space: nowrap; }
+.actions button + button { margin-left: 6px; }
+.table-scroll { overflow-x: auto; }
+.hint { color: #526274; font-size: 14px; }
+.error { padding: 12px; background: #ffeded; color: #9c2323; }
+.success { padding: 12px; background: #e4f4e9; color: #185d35; }
+.ringing { color: #185d35; font-weight: bold; }
+@media (max-width: 600px) { main { margin-top: 16px; padding: 0 12px; } section { padding: 14px; } h1 { font-size: 23px; } }
