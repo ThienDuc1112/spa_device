@@ -1,12 +1,14 @@
 # PDA Android
 
+Code guide: [Activity/Fragment calls services directly](../docs/24-android-direct-services.md).
+
 Vietnamese setup guide: [Firebase, backend connectivity, Android permissions and PDA sound](../docs/23-firebase-and-android-sound-setup.md).
 
 The app follows the requested feature, scanner and device layout. Open **this directory** in Android Studio. The application ID remains `com.company.pda`. See [STRUCTURE.md](STRUCTURE.md) for the full source tree.
 
 | Module | Responsibility |
 |---|---|
-| `app` | DI composition, feature screens/ViewModels, domain use cases, repositories, Firebase and foreground-service lifecycle |
+| `app` | Shared API clients, Activity/Fragment API calls, Firebase and foreground-service lifecycle |
 | `scanner-api` | Plain Java scanner contracts, providers and capabilities |
 | `scanner-zebra` | Zebra DataWedge broadcasts, software trigger and foreground receiver lifecycle |
 | `scanner-urovo` | Urovo ScanWedge broadcasts, software trigger and configuration |
@@ -36,9 +38,9 @@ flowchart TD
  deviceAndroid --> deviceApi[device-api]
 ~~~
 
-Manual dependency injection lives in `di/AppModule`; no Hilt/Dagger setup is required. Domain code has no Android, Retrofit or Room dependencies. Data repositories implement domain interfaces and map transport/cache objects into domain models. Hardware modules never depend on `app`.
+`di/AppModule` holds shared Retrofit API clients, preferences, Room and Android services. Activities and fragments call those services directly, without ViewModel, UseCase or Repository layers. `ScreenTasks` handles background execution and lifecycle-safe UI callbacks; it contains no business logic. Hardware modules never depend on `app`.
 
-`LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use separate fragments and ViewModels. `HomeViewModel` retains Scan Order state across fragment changes. Remote finder management now lives in the React website. Home prompts unregistered PDAs to register after login; local sound settings remain on Android. Firebase and alarm services live under `infrastructure`.
+`LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use fragments that call API services directly. `HomeActivity` retains Scan Order state across fragment changes. Remote finder management now lives in the React website. Home prompts unregistered PDAs to register after login; local sound settings remain on Android. Firebase and alarm services live under `infrastructure`.
 
 ## Build and test
 

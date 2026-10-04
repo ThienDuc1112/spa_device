@@ -123,12 +123,12 @@ Vì vậy cả kết quả `getToken()` và callback `onNewToken()` đều dẫn
 
 ### Đường A: Gửi kèm đăng ký PDA
 
-[PdaFinderRepositoryImpl.register()](../pda-android/app/src/main/java/com/company/pda/data/repository/PdaFinderRepositoryImpl.java) đọc token đang có:
+[HomeActivity.register()](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeActivity.java) gọi API trực tiếp trong công việc nền của `ScreenTasks.run()`. Đoạn gửi request đọc token đang có:
 
 ```java
-String token = tokens.get("fcmToken");
-var r = execute(api.register(new PdaFinderDto.Register(code, name, token)));
-device.registered(r.deviceId, r.deviceSecret);
+String token = modules.tokens.get("fcmToken");
+var r = execute(modules.finderApi.register(new PdaFinderDto.Register(code, name, token)));
+modules.device.registered(r.deviceId, r.deviceSecret);
 ```
 
 Request minh họa:
@@ -147,7 +147,7 @@ Content-Type: application/json
 
 Nếu chưa có token, giá trị là JSON `null` hoặc trường bị bỏ qua khi serialize; không gửi chuỗi `"null"`. API đăng ký yêu cầu role `MANAGER` hoặc `EMPLOYEE`. Home mở form sau login nếu máy chưa đăng ký. Backend lưu thiết bị, token nếu có, và trả về `deviceId`, `deviceSecret` để Android lưu.
 
-Sau đăng ký thành công, [HomeViewModel.register()](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeViewModel.java) gọi lại `modules.fcm.initialize()` và khởi động dịch vụ fallback.
+Sau đăng ký thành công, [HomeActivity.register()](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeActivity.java) gọi lại `modules.fcm.initialize()` và chỉ khởi động polling nếu APK được cấu hình `finderTransport=polling`.
 
 ### Đường B: Đồng bộ token bằng SyncWorker
 

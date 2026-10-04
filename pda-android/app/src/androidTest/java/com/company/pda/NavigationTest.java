@@ -2,7 +2,6 @@ package com.company.pda;
 
 import static org.junit.Assert.*;
 
-import androidx.lifecycle.ViewModelProvider;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -24,7 +23,8 @@ public class NavigationTest {
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
           .getUiAutomation()
-          .grantRuntimePermission(app.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
+          .grantRuntimePermission(
+              app.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
     }
   }
 
@@ -36,11 +36,12 @@ public class NavigationTest {
   @Test
   public void loginScreenInflatesAfterPackageSplit() {
     try (var activity = ActivityScenario.launch(LoginActivity.class)) {
-      activity.onActivity(screen -> {
-        assertTrue(screen.findViewById(R.id.login_username).isShown());
-        assertTrue(screen.findViewById(R.id.login_password).isShown());
-        assertTrue(screen.findViewById(R.id.login_submit).isShown());
-      });
+      activity.onActivity(
+          screen -> {
+            assertTrue(screen.findViewById(R.id.login_username).isShown());
+            assertTrue(screen.findViewById(R.id.login_password).isShown());
+            assertTrue(screen.findViewById(R.id.login_submit).isShown());
+          });
     }
   }
 
@@ -53,28 +54,28 @@ public class NavigationTest {
     try (var scenario = ActivityScenario.launch(HomeActivity.class)) {
       scenario.onActivity(
           activity -> {
-            var vm = new ViewModelProvider(activity).get(HomeViewModel.class);
+            var home = activity;
             var product = new Product();
             product.barcode = "00123";
             product.productCode = "SKU-1";
             product.productName = "Fixture";
-            vm.select(product);
-            vm.navigate("image");
+            home.select(product);
+            home.navigate("image");
           });
       scenario.recreate();
       scenario.onActivity(
           activity -> {
-            var vm = new ViewModelProvider(activity).get(HomeViewModel.class);
-            assertEquals("00123", vm.selected.barcode);
-            assertEquals(1, vm.scanned.size());
-            assertEquals("image", vm.screen.getValue());
-            vm.navigate("product");
+            var home = activity;
+            assertEquals("00123", home.selected.barcode);
+            assertEquals(1, home.scanned.size());
+            assertEquals("image", home.screen);
+            home.navigate("product");
           });
       scenario.onActivity(
           activity -> {
-            var vm = new ViewModelProvider(activity).get(HomeViewModel.class);
-            assertEquals("SKU-1", vm.selected.productCode);
-            assertEquals(1, vm.scanned.size());
+            var home = activity;
+            assertEquals("SKU-1", home.selected.productCode);
+            assertEquals(1, home.scanned.size());
           });
     }
   }

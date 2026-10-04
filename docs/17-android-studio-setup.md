@@ -252,7 +252,7 @@ Chi tiết cấu hình nằm trong [hướng dẫn triển khai](11-deployment.m
 
 Mẫu Compose như **Empty Activity** tạo code Kotlin. Việc cài JDK 21 không đổi ngôn ngữ của template sang Java. Compose dùng Kotlin cho phần giao diện. [Thiết lập Compose và lựa chọn ngôn ngữ](https://developer.android.com/develop/ui/compose/setup).
 
-Sau khi tạo, vẫn cần nối Activity với ViewModel, Data Binding và repository theo cấu trúc của app; wizard không tự hoàn thành luồng nghiệp vụ MVVM.
+Sau khi tạo, dùng View Binding và gọi API/service trực tiếp trong Activity/Fragment. Dùng `ScreenTasks` để chạy tác vụ nền; wizard không tự viết lời gọi API. Xem [hướng dẫn code hiện tại](24-android-direct-services.md).
 
 ## 11. Lỗi thường gặp
 

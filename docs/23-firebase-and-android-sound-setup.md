@@ -1,5 +1,7 @@
 # 23. Cấu hình Firebase, backend và Android để tìm PDA bằng âm thanh
 
+Code Android hiện gọi service trực tiếp từ Activity/Fragment; xem [vị trí code từng chức năng](24-android-direct-services.md).
+
 Hướng dẫn cho code hiện tại: tìm thiết bị trên React; Android đăng ký sau đăng nhập, nhận FCM và phát âm thanh. Thực hiện phần backend một lần và phần Android trên từng PDA.
 
 ```text

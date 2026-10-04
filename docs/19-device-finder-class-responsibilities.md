@@ -27,11 +27,11 @@ PDA đích mặc định nhận lệnh qua FCM. Chỉ khi build/cài APK với `
 | React `App` trong [main.jsx](../pda-web/src/main.jsx) | Nhóm thiết bị theo cửa hàng, lọc, gửi Tìm/Dừng, refresh trạng thái, hiện lỗi. |
 | `api()` trong React | Gọi nhóm API `/web/finder` bằng fetch; không có token hoặc màn hình login. |
 | `vite.config.js` | Proxy dev/preview tới Spring Boot; bản deploy tĩnh dùng reverse proxy. |
-| Android `HomeActivity/HomeViewModel` | Sau login mở form đăng ký nếu chưa có credential; giữ nút đăng ký lại khi bỏ qua. |
-| `PdaFinderRepositoryImpl` | Gọi API đăng ký, lưu credential và chuyển lệnh âm thanh cục bộ tới AlarmController. Không còn tìm/dừng PDA khác. |
+| Android `HomeActivity` | Sau login mở form đăng ký nếu chưa có credential; giữ nút đăng ký lại khi bỏ qua. |
+| `HomeActivity.register()` | Gọi trực tiếp `PdaFinderApi.register()`, lưu deviceId/secret rồi đồng bộ FCM token. |
 | `PdaFinderApi` | API đăng ký, đồng bộ token, nhận lệnh và ACK của PDA. |
 
-Đã bỏ `PdaFinderActivity/PdaFinderViewModel/PdaFinderUiState` và layout tương ứng. Website gửi yêu cầu; `StartPdaAlarmUseCase` chỉ thuộc Android nhận lệnh. Xem [hướng dẫn React](21-react-device-finder.md).
+Website gửi yêu cầu; Android nhận lệnh qua `FinderCommandHandler` và gọi trực tiếp `AlarmController`. Đã bỏ các lớp UseCase/Repository/ViewModel trung gian của Android. Xem [hướng dẫn React](21-react-device-finder.md).
 
 ## 3. Backend tiếp nhận và lưu yêu cầu
 
@@ -74,8 +74,6 @@ Các class như `FindPdaRequest`, `FindPdaCommand`, `FindPdaResult`, `FindPdaRes
 | `FinderPollingService` | Chỉ chạy khi cấu hình `polling`; nhận lệnh HTTP, backoff khi lỗi, không kiểm tra FCM health. | Có vòng đời và lịch chạy nền riêng, độc lập với một phiên chuông. |
 | `FinderPollingCycle` | Chỉ gọi commands khi được bật bằng cấu hình; nhịp thành công 5 giây. | Tách việc lấy lệnh khỏi Android Service để kiểm thử không có HTTP khi tắt polling. |
 | `FinderCommandHandler` | Xử lý FIND/STOP; kiểm tra UUID, deadline, lệnh đã xử lý và phiên đang chạy. | FCM và polling dùng cùng quy tắc, tránh xử lý khác nhau hoặc bật chuông trùng. |
-| `StartPdaAlarmUseCase` | Chuyển yêu cầu bật chuông tới repository. | Thể hiện thao tác ở tầng domain; hiện chưa có logic riêng đáng kể. |
-| `StopPdaAlarmUseCase` | Chuyển yêu cầu dừng chuông tới repository. | Tương tự use case bật chuông. |
 | `AlarmController` | Tạo Intent khởi động service; đánh dấu request đã dừng và dừng đúng phiên. | Gom chi tiết điều khiển Android Service vào một chỗ. |
 | `PdaAlarmService` | Quản lý phiên chuông, foreground notification, adapter, kiểm tra âm thanh và báo kết quả. | Chuông cần hoạt động độc lập với màn hình và được giải phóng tài nguyên theo vòng đời service. |
 | `AlarmTimeoutManager` | Đặt/hủy lịch dừng theo deadline. | Gom trách nhiệm quản lý timer. |
@@ -128,12 +126,11 @@ Mỗi phần có lý do thay đổi và kiểu lỗi khác nhau.
 
 Những phần hiện có thể cân nhắc đơn giản hóa:
 
-- `StartPdaAlarmUseCase` và `StopPdaAlarmUseCase`: hiện chỉ chuyển tiếp một lời gọi.
 - `DeviceModule.alarm()`: chủ yếu bọc lời gọi factory.
 - `ZebraAlarmAdapter` và `UrovoAlarmAdapter`: chưa có hành vi khác triển khai Android chung.
 - Các bộ DTO/model/entity giống nhau: lợi ích tách lớp cần cân đối với lượng code mapping.
 
-Riêng `PdaFinderRepositoryImpl` đang gánh cả gọi API từ xa và điều khiển chuông cục bộ. Vì thế đoạn `Handler → UseCase → Repository → AlarmController` có phần vòng vèo. Nếu refactor, nên ưu tiên làm rõ hai trách nhiệm này, đồng thời giảm các lớp chỉ chuyển tiếp khi chúng chưa mang lại giá trị cụ thể.
+Android đã đơn giản hóa: `HomeActivity` gọi Retrofit để đăng ký; `FinderCommandHandler` gọi trực tiếp `AlarmController.start/stop`. Backend giữ kiến trúc hiện tại. Các Activity/Fragment khác cũng gọi API trực tiếp; `ScreenTasks` chỉ chạy công việc ngoài UI thread và bỏ callback khi màn hình bị hủy.
 
 ## 9. Tài liệu liên quan
 

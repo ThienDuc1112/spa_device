@@ -30,7 +30,7 @@ Mỗi lệnh tạo APK ở cùng đường dẫn; cài đúng bản vừa build.
 - [FinderPollingService](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderPollingService.java): `start()` không khởi động và dừng service cũ ở FCM mode; `onStartCommand()` kiểm tra lại để chặn direct start/sticky restart.
 - [FinderPollingCycle](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderPollingCycle.java): chỉ gọi commands nếu bật polling, không còn health check hoặc trạng thái lỗi FCM.
 - [PdaFirebaseMessagingService](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/PdaFirebaseMessagingService.java): bỏ qua message ở polling mode; vẫn giữ callback token.
-- `HomeViewModel.checkRegistration()` gọi health một lần khi Home resume để kiểm tra credential còn hiệu lực sau khi xóa PDA trên web; không dựa vào trạng thái FCM để đổi transport.
+- `HomeActivity.checkRegistration()` gọi health một lần khi Home resume để kiểm tra credential còn hiệu lực sau khi xóa PDA trên web; không dựa vào trạng thái FCM để đổi transport.
 - [HomeActivity](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeActivity.java): khi resume thử lại lấy token nếu có `TOKEN_ERROR`, độc lập với polling.
 - [FinderCommandHandler](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderCommandHandler.java): tiếp tục dùng chung cho cả hai transport; không tự chọn/chuyển transport.
 

@@ -1,5 +1,13 @@
 # Verification results
 
+## Android direct service calls — 2026-10-03
+
+- Activities/fragments now call Retrofit API clients directly. Removed Android business ViewModels, UseCases and Repository interfaces/implementations; Firebase/polling call AlarmController directly. Home state uses Bundle; UI callbacks wait until the screen is started and are dropped after destruction.
+- JDK 21: `:app:assembleDebug :app:testDebugUnitTest :device-android:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug` passed. App: 7 unit tests; device-android: 17 unit tests. Lint: 0 errors, 20 warnings (including hardcoded UI text and layout overdraw).
+- Four instrumentation tests passed on the connected emulator: login UI, image navigation/rotation retaining scanned products, work off the main thread with UI callback on main, and dropping callbacks after screen destruction. Used a separate `com.company.pda.refactortest` package and unreachable local API URL; preserved the installed production-package app and its registration. Temporary test packages were removed by the test runner.
+- Source structure check passed for 322 paths; local Android documentation links checked. See [direct service code guide](24-android-direct-services.md). Real server login/inventory/disposal mutations and live FCM sound were not exercised by these isolated instrumentation tests.
+- Environment notes: native unit tests initially failed because C: had no space for temporary files; rerun passed with process-local temp directory on D:. The broad all-module `assembleDebugAndroidTest` also exposed a pre-existing Kotlin duplicate dependency in scanner-factory's test APK; the app instrumentation APK builds successfully. No scanner dependency changes were made for that unrelated task.
+
 ## Device deletion and finder delivery diagnosis — 2026-10-03
 
 - Read-only inspection of the running dev database found the latest web request had QUEUED/STOP_REQUESTED logs, no PUSH_FIND, and unprocessed outbox rows with attempts=0. Dev configuration disabled the scheduler. No real device/request rows were deleted or changed during diagnosis.

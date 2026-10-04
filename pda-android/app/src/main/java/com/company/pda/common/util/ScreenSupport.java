@@ -19,27 +19,27 @@ public final class ScreenSupport {
         });
   }
 
-  public static void observe(AppCompatActivity activity, LifecycleOwner owner, AsyncViewModel vm) {
+  public static void observe(AppCompatActivity activity, LifecycleOwner owner, ScreenTasks tasks) {
     var loading =
         new AlertDialog.Builder(activity)
-            .setMessage("Working…")
+            .setMessage("Workingâ€¦")
             .setView(new ProgressBar(activity))
             .setCancelable(false)
             .create();
     final AlertDialog[] errorDialog = {null};
-    vm.busy.observe(
+    tasks.busy.observe(
         owner,
         b -> {
           if (Boolean.TRUE.equals(b)) loading.show();
           else loading.dismiss();
         });
-    vm.error.observe(
+    tasks.error.observe(
         owner,
         error -> {
           if (error == null) return;
-          vm.error.setValue(null);
+          tasks.error.setValue(null);
           if (!(activity instanceof LoginActivity)
-              && !((PdaApplication) activity.getApplication()).modules().auth.loggedIn()) {
+              && ((PdaApplication) activity.getApplication()).modules().tokens.tokens() == null) {
             login(activity);
             return;
           }
@@ -48,7 +48,7 @@ public final class ScreenSupport {
                   .setTitle("Unable to complete action")
                   .setMessage(error)
                   .setNegativeButton("Close", null)
-                  .setPositiveButton("Retry", (d, w) -> vm.retry())
+                  .setPositiveButton("Retry", (d, w) -> tasks.retry())
                   .show();
         });
     owner

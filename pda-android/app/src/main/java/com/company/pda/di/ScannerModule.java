@@ -1,13 +1,11 @@
 package com.company.pda.di;
 
 import android.content.Context;
-import com.company.pda.data.repository.ScannerRepositoryImpl;
-import com.company.pda.domain.scanner.ScannerRepository;
 import com.company.scanner.api.*;
 import com.company.scanner.factory.ScannerFactory;
 
 public final class ScannerModule {
-  public static ScannerRepository provide(Context context) {
+  public static ScannerManager provide(Context context) {
     var prefs = context.getSharedPreferences("scanner", Context.MODE_PRIVATE);
     ScannerType type;
     try {
@@ -25,6 +23,6 @@ public final class ScannerModule {
       if (extra.isBlank()) extra = defaults.dataExtra();
     }
     var config = new ScannerConfig(type, action, extra, permission.isBlank() ? null : permission);
-    return new ScannerRepositoryImpl(ScannerFactory.forAndroid(context).create(config));
+    return ScannerFactory.forAndroid(context).create(config);
   }
 }

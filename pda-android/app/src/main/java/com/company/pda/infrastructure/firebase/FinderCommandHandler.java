@@ -1,8 +1,6 @@
 package com.company.pda.infrastructure.firebase;
 
 import com.company.pda.PdaApplication;
-import com.company.pda.domain.usecase.StartPdaAlarmUseCase;
-import com.company.pda.domain.usecase.StopPdaAlarmUseCase;
 import com.company.pda.infrastructure.alarm.PdaAlarmService;
 
 /** Called on the main thread by both transports, including STOP tombstones. */
@@ -15,7 +13,7 @@ public final class FinderCommandHandler {
       return;
     }
     if ("STOP".equals(command)) {
-      new StopPdaAlarmUseCase(app.modules().finder).execute(id);
+      app.modules().alarm.stop(id);
       return;
     }
     if (!"FIND".equals(command)
@@ -33,7 +31,7 @@ public final class FinderCommandHandler {
       return;
     }
     try {
-      new StartPdaAlarmUseCase(app.modules().finder).execute(id, expiry);
+      app.modules().alarm.start(id, expiry);
     } catch (RuntimeException e) {
       PdaAlarmService.notifyFallback(app, id);
       // Do not mark handled: a later delivery in the configured transport may retry before expiry.

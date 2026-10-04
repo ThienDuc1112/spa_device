@@ -22,7 +22,7 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         buildConfigField 'String', 'API_URL', '"' + (project.findProperty('apiUrl') ?: 'http://10.0.2.2:8080/') + '"'
     }
-    buildFeatures { dataBinding true; buildConfig true
+    buildFeatures { viewBinding true; buildConfig true
         compose true
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17; coreLibraryDesugaringEnabled true }

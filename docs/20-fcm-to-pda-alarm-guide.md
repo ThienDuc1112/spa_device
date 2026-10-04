@@ -151,14 +151,20 @@ public void refreshed(String token) {
 }
 ```
 
-Trong [PdaFinderRepositoryImpl.java](../pda-android/app/src/main/java/com/company/pda/data/repository/PdaFinderRepositoryImpl.java), đăng ký thiết bị gửi token hiện có và lưu credential trả về:
+Trong [HomeActivity.java](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeActivity.java), đăng ký thiết bị gửi token hiện có và lưu credential trả về:
 
 ```java
-public void register(String code, String name) throws java.io.IOException {
-  String token = tokens.get("fcmToken");
-  var r = execute(api.register(new PdaFinderDto.Register(code, name, token)));
-  device.registered(r.deviceId, r.deviceSecret);
-}
+tasks.run("Registering device…", () -> {
+  String token = modules.tokens.get("fcmToken");
+  var r = execute(modules.finderApi.register(new PdaFinderDto.Register(code, name, token)));
+  modules.device.registered(r.deviceId, r.deviceSecret);
+  return () -> {
+    tasks.clearRetry();
+    modules.fcm.initialize();
+    FinderPollingService.start(getApplication());
+    tasks.status.setValue("Device registered");
+  };
+});
 ```
 
 API tương ứng là `POST /devices/register`. Có thể đăng ký khi chưa có token; khi SDK lấy/đổi token, `onNewToken()` gọi `fcm.refreshed(token)` và [SyncWorker.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncWorker.java) đồng bộ qua:
@@ -316,7 +322,7 @@ App kiểm tra **priority thực tế nhận được**, vì message yêu cầu 
 3. Với `FIND`, bỏ qua request đã có `handled:<id>` hoặc đang reo cùng ID.
 4. Parse `expiresAt` và bỏ qua yêu cầu hết hạn.
 5. Nếu `mayStart=false`, hiện notification đề nghị mở app.
-6. Gọi `StartPdaAlarmUseCase`; nếu start thất bại, hiện notification fallback.
+6. Gọi trực tiếp `AlarmController.start()`; nếu start thất bại, hiện notification fallback.
 
 Đoạn xử lý thời hạn/start:
 
@@ -327,7 +333,7 @@ if (!mayStart) {
   return;
 }
 try {
-  new StartPdaAlarmUseCase(app.modules().finder).execute(id, expiry);
+  app.modules().alarm.start(id, expiry);
 } catch (RuntimeException e) {
   PdaAlarmService.notifyFallback(app, id);
 }
@@ -336,8 +342,7 @@ try {
 Đường gọi tiếp theo:
 
 ```text
-StartPdaAlarmUseCase.execute()
-  → PdaFinderRepositoryImpl.startLocal()
+FinderCommandHandler.handle()
   → AlarmController.start()
   → PdaAlarmService.onStartCommand()
 ```

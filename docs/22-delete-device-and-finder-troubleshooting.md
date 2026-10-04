@@ -20,7 +20,7 @@ Code: [WebFinderController](../pda-management/src/main/java/com/company/pda/pres
 
 ## Đăng ký lại Android sau khi xóa
 
-Cài APK mới rồi mở Home. `HomeViewModel.checkRegistration()` gọi `/pda/fcm-health` bằng credential thiết bị một lần khi Home resume để kiểm tra đăng ký:
+Cài APK mới rồi mở Home. `HomeActivity.checkRegistration()` gọi `/pda/fcm-health` bằng credential thiết bị một lần khi Home resume để kiểm tra đăng ký:
 
 - HTTP 401: xóa cặp deviceId/deviceSecret cũ nếu chúng vẫn khớp cặp đã kiểm tra, dừng service polling/chuông cũ, hiện form Register.
 - Thành công: giữ đăng ký, kể cả response báo FCM_DISABLED; tình trạng FCM không quyết định thiết bị đã đăng ký hay chưa.

@@ -15,12 +15,9 @@ flowchart TD
     Wedge --> Intent[Broadcast Intent chứa barcode]
     Intent --> Receiver[BarcodeReceiver]
     Receiver --> Callback[ScanCallback]
-    Callback --> Repository[ScannerRepositoryImpl]
-    Repository --> ViewModel[ScannerViewModel]
-    ViewModel --> UseCase[ScanBarcodeUseCase kiểm tra dữ liệu]
-    UseCase --> State[ScannerUiState / LiveData]
-    State --> Fragment[ProductFragment]
-    Fragment --> Lookup[ProductViewModel.lookup tìm sản phẩm]
+    Callback --> Fragment[ProductFragment]
+    Fragment --> Validate[BarcodeInput.normalize]
+    Validate --> Lookup[ProductApi.product]
 ```
 
 Quá trình giải mã barcode diễn ra trước khi broadcast được gửi. `BarcodeReceiver` chỉ nhận dữ liệu đã giải mã, không điều khiển cảm biến hoặc xử lý ảnh từ đầu đọc.
@@ -36,7 +33,7 @@ Các folder bên dưới là những Gradle module riêng trong `pda-android`.
 | `scanner-zebra` | Adapter Zebra sử dụng DataWedge; hỗ trợ software trigger | `ZebraScannerProvider`, `ZebraScannerManager`, `ZebraScannerConfig` |
 | `scanner-urovo` | Adapter Urovo ScanWedge; nhận broadcast chung và hỗ trợ software trigger | `UrovoScannerProvider`, `UrovoScannerManager`, `UrovoScannerConfig` |
 | `scanner-factory` | Chọn provider phù hợp và tạo scanner manager từ cấu hình | `ScannerFactory` |
-| `app` | Đọc thiết lập, tạo repository, xử lý nghiệp vụ và cập nhật giao diện | `ScannerModule`, `ScannerRepositoryImpl`, `ScannerViewModel`, `ScanBarcodeUseCase`, `ProductFragment` |
+| `app` | Đọc thiết lập, gọi scanner/API trực tiếp và cập nhật giao diện | `ScannerModule`, `BarcodeInput`, `ProductFragment` |
 
 Quan hệ phụ thuộc chính:
 
@@ -86,11 +83,11 @@ Honeywell được xử lý bởi `GenericScannerProvider` và `IntentScannerMan
 
 Màn hình nhận barcode hiện tại là `ProductFragment` trong chức năng Scan Order.
 
-1. `ProductFragment.onResume()` gọi `ScannerViewModel.start()`.
-2. Nếu chưa có repository, ViewModel gọi `ScannerModule.provide(context)`.
+1. `ProductFragment.onResume()` gọi `reloadScanner()`.
+2. Fragment gọi `ScannerModule.provide(context)` để tạo manager.
 3. `ScannerModule` đọc SharedPreferences tên `scanner`, gồm `type`, `action`, `extra` và `permission`.
-4. Module tạo `ScannerConfig`, gọi `ScannerFactory` để tạo manager và bọc manager bằng `ScannerRepositoryImpl`.
-5. Repository gọi `manager.start(...)`, truyền callback chuyển kết quả tới ViewModel.
+4. Module tạo `ScannerConfig`, gọi `ScannerFactory` và trả về `ScannerManager`.
+5. Fragment gọi `manager.start(...)`, nhận callback và chuyển sang UI thread để gọi `lookup()`.
 6. `IntentScannerManager` kết thúc phiên cũ nếu có, kiểm tra cấu hình và đăng ký một `BarcodeReceiver` mới bằng `ContextCompat.registerReceiver(...)`.
 
 Receiver được đăng ký với `RECEIVER_EXPORTED` để nhận broadcast từ dịch vụ scanner bên ngoài ứng dụng. Filter nhận action đã cấu hình, với intent không có category hoặc có `android.intent.category.DEFAULT`. Sender permission là tùy chọn và phải khớp quyền mà dịch vụ gửi thực sự có.
@@ -125,11 +122,9 @@ extras:
 
 Với Urovo dùng key `barcode_string`, nếu trường này không tồn tại thì receiver thử đọc `barcode` dạng byte. Nếu payload byte có trường `length`, giá trị này phải là số nguyên trong phạm vi mảng byte.
 
-`ScannerRepositoryImpl` chuyển kết quả của scanner API thành `com.company.pda.domain.model.ScanResult`, rồi gọi callback của ViewModel. Hai lớp cùng tên nằm ở hai tầng khác nhau để giữ độc lập giữa thư viện scanner và model nghiệp vụ.
+`ProductFragment` nhận `scanner-api.ScanResult` trực tiếp. `BarcodeInput.normalize()` trim và kiểm tra barcode có từ **1 đến 50 ký tự**, giữ số 0 đầu mã. Fragment gọi `productsApi.product()` ngoài UI thread, lưu cache Room; chỉ lỗi kết nối mới dùng cache, lỗi HTTP không bị che bằng dữ liệu cũ.
 
-`ScannerViewModel.submit()` gọi `ScanBarcodeUseCase.execute()`. Use case loại bỏ khoảng trắng đầu/cuối và kiểm tra barcode có từ **1 đến 50 ký tự**. Dữ liệu không hợp lệ trở thành trạng thái lỗi; receiver không tự cắt hoặc âm thầm bỏ barcode dài.
-
-ViewModel cập nhật `ScannerUiState` qua LiveData. `ProductFragment` quan sát trạng thái, lấy kết quả, gọi `scanner.consume()` để xóa sự kiện đã xử lý, rồi gọi `ProductViewModel.lookup(barcode)` để tìm sản phẩm. Nếu có lỗi, fragment chuyển lỗi sang ViewModel của màn hình để hiển thị.
+Callback được kiểm tra phiên scanner và lifecycle để không tra sản phẩm từ phiên cũ sau khi đổi cấu hình hoặc rời màn hình.
 
 ## 6. Cấu hình và khác biệt giữa các hãng
 
@@ -142,7 +137,7 @@ ViewModel cập nhật `ScannerUiState` qua LiveData. `ProductFragment` quan sá
 
 `com.company.pda.SCAN` là action do ứng dụng quy ước, không phải giá trị mặc định chung của mọi thiết bị. Người dùng cần cấu hình wedge gửi đúng action và payload key hoặc sửa thiết lập trong ứng dụng cho khớp với profile thiết bị.
 
-Thao tác trong ứng dụng: mở **Scanner settings**, chọn loại scanner, nhấn **Use selected scanner defaults**, điều chỉnh nếu cần rồi **Save**. Việc lưu sẽ gọi `ScannerViewModel.reload()` để thay repository và áp dụng cấu hình mới. Nút dùng cấu hình mặc định chỉ điền thiết lập phía ứng dụng, không tự cấu hình dịch vụ của hãng.
+Thao tác trong ứng dụng: mở **Scanner settings**, chọn loại scanner, nhấn **Use selected scanner defaults**, điều chỉnh nếu cần rồi **Save**. Việc lưu sẽ gọi `ProductFragment.reloadScanner()` để thay manager và áp dụng cấu hình mới. Nút dùng cấu hình mặc định chỉ điền thiết lập phía ứng dụng, không tự cấu hình dịch vụ của hãng.
 
 Với Zebra, bật Barcode input, bật Intent output và chọn **Broadcast Intent** trong DataWedge; gắn profile với `com.company.pda`. Với Urovo hoặc Honeywell, bật chế độ broadcast/intent output tương ứng trên thiết bị. Tắt keyboard output khi dùng broadcast để tránh xử lý một lần quét hai lần.
 
@@ -153,7 +148,7 @@ Adapter Honeywell hiện nhận kết quả từ profile đã được cấu hì
 | Cách kích hoạt | Luồng điều khiển | Hỗ trợ hiện tại |
 |---|---|---|
 | Nút vật lý trên PDA | Nút → dịch vụ hãng → scan engine → broadcast kết quả | Các thiết bị có wedge được cấu hình tương thích |
-| Nút **Trigger configured scanner** trong app | ViewModel → repository → `manager.trigger()` | Zebra DataWedge, Urovo ScanWedge tương thích và camera |
+| Nút **Trigger configured scanner** trong app | ProductFragment → `manager.trigger()` | Zebra DataWedge, Urovo ScanWedge tương thích và camera |
 
 Đối với Zebra, `trigger()` chỉ gửi lệnh khi phiên nhận đang hoạt động:
 
@@ -172,8 +167,6 @@ Urovo cũng gửi `START_SCANNING`/`STOP_SCANNING`, nhưng dùng action `com.ubx
 
 ```text
 ProductFragment.onPause()
-    → ScannerViewModel.stop()
-    → ScannerRepositoryImpl.stop()
     → ScannerManager.stop()
     → vô hiệu hóa callback
     → unregisterReceiver()
@@ -181,7 +174,7 @@ ProductFragment.onPause()
 
 Khi rời màn hình hoặc ứng dụng bị pause, receiver của phiên nhận được hủy đăng ký. Callback cũng bị vô hiệu hóa để receiver cũ không xử lý kết quả đến muộn. Gọi `stop()` nhiều lần không đăng ký thêm hoặc hủy lại một receiver đã được dừng.
 
-Zebra và Urovo gửi thêm `STOP_SCANNING` theo giao thức riêng của hãng khi kết thúc phiên đang hoạt động, rồi hủy receiver trong `finally`. `ScannerViewModel.onCleared()` cũng gọi `stop()` để giải phóng phiên nhận.
+Zebra và Urovo gửi thêm `STOP_SCANNING` theo giao thức riêng của hãng khi kết thúc phiên đang hoạt động, rồi hủy receiver trong `finally`. `ProductFragment.onPause()` dừng phiên nhận và vô hiệu callback cũ.
 
 Khi trở lại màn hình, `onResume()` gọi `start()` để đăng ký một phiên mới. Không có receiver khai báo trong manifest để xử lý barcode khi màn hình quét đã dừng.
 
@@ -189,8 +182,8 @@ Khi trở lại màn hình, `onResume()` gọi `start()` để đăng ký một 
 
 Hai chế độ này có cùng hợp đồng `ScannerManager` nhưng nhận kết quả theo cách khác:
 
-- **KEYBOARD**: scanner nhập ký tự vào ô đang focus như bàn phím. Khi nhấn Enter hoặc nút tìm kiếm, giao diện gọi `ScannerViewModel.submit(...)`. `KeyboardScannerManager` không đăng ký receiver.
-- **CAMERA**: `CameraScannerManager` mở Google code scanner bằng software trigger, nhận kết quả từ callback của thư viện rồi chuyển qua repository tới ViewModel. Nó không sử dụng broadcast từ wedge.
+- **KEYBOARD**: scanner nhập ký tự vào ô đang focus như bàn phím. Khi nhấn Enter hoặc nút tìm kiếm, giao diện gọi `ProductFragment.lookup(...)`. `KeyboardScannerManager` không đăng ký receiver.
+- **CAMERA**: `CameraScannerManager` mở Google code scanner bằng software trigger, nhận kết quả từ callback của thư viện rồi chuyển trực tiếp tới callback của Fragment. Nó không sử dụng broadcast từ wedge.
 
 Nhờ dùng chung hợp đồng, nghiệp vụ kiểm tra barcode và tìm sản phẩm có thể dùng lại cho nhiều phương thức nhập.
 
@@ -206,7 +199,6 @@ Các cách tổ chức thể hiện trong code:
 | Strategy | Các manager cung cấp cách nhận/kích hoạt khác nhau dưới cùng `ScannerManager` |
 | Adapter | Các adapter chuyển giao tiếp scanner của hãng thành hợp đồng scanner chung |
 | Callback và quan sát trạng thái | `ScanCallback` chuyển kết quả; LiveData thông báo cho giao diện |
-| Repository | `ScannerRepositoryImpl` nối tầng scanner với model và hợp đồng nghiệp vụ |
 
 Nếu thêm hãng có broadcast tương thích, có thể cấu hình chế độ `INTENT`. Nếu hãng cần lệnh điều khiển hoặc giao thức riêng, có thể bổ sung module, provider và manager tương ứng, rồi đăng ký provider trong factory. Các định dạng payload hoặc key symbology mới cũng cần bổ sung xử lý nếu khác cơ chế generic hiện tại.
 
@@ -217,8 +209,8 @@ Nếu thêm hãng có broadcast tương thích, có thể cấu hình chế đ�
 3. [IntentScannerManager](../pda-android/scanner-generic/src/main/java/com/company/scanner/generic/IntentScannerManager.java): đăng ký/hủy receiver.
 4. [BarcodeReceiver](../pda-android/scanner-generic/src/main/java/com/company/scanner/generic/BarcodeReceiver.java): đọc và chuẩn hóa payload.
 5. [ZebraScannerManager](../pda-android/scanner-zebra/src/main/java/com/company/scanner/zebra/ZebraScannerManager.java) và [UrovoScannerManager](../pda-android/scanner-urovo/src/main/java/com/company/scanner/urovo/UrovoScannerManager.java): adapter từng hãng.
-6. [ScannerModule](../pda-android/app/src/main/java/com/company/pda/di/ScannerModule.java) và [ScannerRepositoryImpl](../pda-android/app/src/main/java/com/company/pda/data/repository/ScannerRepositoryImpl.java): cấu hình và kết nối các tầng.
-7. [ScannerViewModel](../pda-android/app/src/main/java/com/company/pda/presentation/scanner/ScannerViewModel.java) và [ScanBarcodeUseCase](../pda-android/app/src/main/java/com/company/pda/domain/usecase/ScanBarcodeUseCase.java): xử lý kết quả và kiểm tra nghiệp vụ.
+6. [ScannerModule](../pda-android/app/src/main/java/com/company/pda/di/ScannerModule.java): tạo manager từ thiết lập.
+7. [ProductFragment](../pda-android/app/src/main/java/com/company/pda/presentation/product/ProductFragment.java) và [BarcodeInput](../pda-android/app/src/main/java/com/company/pda/common/util/BarcodeInput.java): nhận barcode và gọi API sản phẩm.
 8. [ProductFragment](../pda-android/app/src/main/java/com/company/pda/presentation/product/ProductFragment.java): vòng đời và hiển thị kết quả.
 
 Hướng dẫn cấu hình và thử broadcast: [Broadcast scanner integration](../pda-android/scanner-generic/README.md). Thiết lập riêng cho Zebra: [Zebra DataWedge scanner](../pda-android/scanner-zebra/README.md). Broadcast giả lập kiểm tra được đường nhận dữ liệu của ứng dụng; khả năng quét phần cứng vẫn cần kiểm tra trên PDA thật.

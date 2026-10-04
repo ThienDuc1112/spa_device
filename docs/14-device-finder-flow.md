@@ -44,7 +44,7 @@ Android mặc định `finderTransport=fcm`: không chạy polling service/healt
 
 ## Phát âm thanh
 
-`FinderCommandHandler → StartPdaAlarmUseCase → PdaFinderRepositoryImpl.startLocal → AlarmController → PdaAlarmService`.
+`FinderCommandHandler → AlarmController → PdaAlarmService`.
 
 Foreground service mở notification, chọn adapter bằng DeviceModule/DeviceAlarmFactory, kiểm tra DND/audio focus, lưu và tăng âm lượng alarm, phát `pda_alarm.mp3` lặp. AndroidAlarmPlayer dùng USAGE_ALARM và ưu tiên loa tích hợp; volume được khôi phục khi kết thúc. Các adapter Zebra/Urovo hiện dùng API Android công khai, không có đặc quyền tự vượt DND.
 

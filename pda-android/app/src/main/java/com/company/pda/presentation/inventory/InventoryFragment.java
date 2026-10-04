@@ -1,17 +1,24 @@
 package com.company.pda.presentation.inventory;
 
+import static com.company.pda.common.util.ApiCalls.execute;
+
 import android.os.Bundle;
 import android.view.*;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.ViewModelProvider;
+import com.company.pda.PdaApplication;
 import com.company.pda.common.util.*;
-import com.company.pda.presentation.home.HomeViewModel;
+import com.company.pda.data.remote.dto.inventory.InventoryDto;
+import com.company.pda.di.AppModule;
+import com.company.pda.presentation.home.HomeActivity;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 public class InventoryFragment extends Fragment {
-  private InventoryViewModel vm;
-  private HomeViewModel home;
+  private ScreenTasks tasks;
+  private AppModule modules;
+  private InventoryDto row;
+  private HomeActivity home;
   private ScreenViews ui;
 
   public static InventoryFragment forProduct(String code) {
@@ -29,38 +36,72 @@ public class InventoryFragment extends Fragment {
   }
 
   public void onViewCreated(@NonNull View view, Bundle saved) {
-    var provider = new ViewModelProvider(requireActivity());
-    vm = provider.get(InventoryViewModel.class);
-    home = provider.get(HomeViewModel.class);
-    ScreenSupport.observe((AppCompatActivity) requireActivity(), getViewLifecycleOwner(), vm);
-    vm.uiState.observe(
-        getViewLifecycleOwner(),
-        state -> {
-          if (state.saved()) {
-            home.status.setValue("Inventory saved • " + state.inventory().quantity);
-            vm.acknowledgeSave();
-            home.navigate("product");
-            return;
-          }
-          render(state);
-        });
-    vm.load(getArguments() == null ? null : getArguments().getString("productCode"));
+    home = (HomeActivity) requireActivity();
+    modules = ((PdaApplication) home.getApplication()).modules();
+    tasks = new ScreenTasks(requireContext(), getViewLifecycleOwner());
+    ScreenSupport.observe(home, getViewLifecycleOwner(), tasks);
+    load();
   }
 
-  private void render(InventoryUiState state) {
+  private void load() {
+    String code = getArguments() == null ? null : getArguments().getString("productCode");
+    if (code == null) {
+      render();
+      return;
+    }
+    tasks.run(
+        "Loading inventory...",
+        () -> {
+          var result = execute(modules.inventoryApi.inventory(code));
+          return () -> {
+            tasks.clearRetry();
+            row = result;
+            render();
+          };
+        });
+  }
+
+  private void adjust(String quantity, String reason) {
+    if (row == null) return;
+    final BigDecimal count;
+    try {
+      count = new BigDecimal(quantity);
+    } catch (Exception e) {
+      tasks.error.setValue("Enter a valid quantity");
+      return;
+    }
+    var body =
+        new InventoryDto.Adjustment(
+            UUID.randomUUID().toString(),
+            getArguments().getString("productCode"),
+            count,
+            row.version,
+            reason);
+    tasks.run(
+        "Saving inventory...",
+        () -> {
+          var updated = execute(modules.inventoryApi.adjust(body));
+          return () -> {
+            tasks.clearRetry();
+            home.tasks.status.setValue("Inventory saved - " + updated.quantity);
+            home.navigate("product");
+          };
+        });
+  }
+
+  private void render() {
     ui.clear();
-    if (state.inventory() == null) {
+    if (row == null) {
       ui.text("Select a product in Scan Order", 18);
       return;
     }
-    var row = state.inventory();
     ui.text(getArguments().getString("productCode"), 22);
     ui.text("Current quantity: " + row.quantity + " • version " + row.version, 16);
     var qty = ui.input("New quantity", row.quantity.toPlainString(), 8194);
     var reason = ui.input("Reason", "", 1);
     ui.button(
-        "Save adjustment", () -> vm.adjust(qty.getText().toString(), reason.getText().toString()));
-    ui.button("Reload current stock", () -> vm.load(getArguments().getString("productCode")));
+        "Save adjustment", () -> adjust(qty.getText().toString(), reason.getText().toString()));
+    ui.button("Reload current stock", this::load);
   }
 
   public void onDestroyView() {
