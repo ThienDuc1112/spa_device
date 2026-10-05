@@ -58,4 +58,4 @@ X-Device-Secret: <secret nhận khi đăng ký PDA>
 
 Unit tests nằm trong [FinderPollingCycleTest](../pda-android/app/src/test/java/com/company/pda/infrastructure/firebase/FinderPollingCycleTest.java); test vòng đời service theo từng build nằm trong [FinderCommandTest](../pda-android/app/src/androidTest/java/com/company/pda/FinderCommandTest.java). Test instrumentation cần chạy riêng với cả hai giá trị `finderTransport`; build test APK chưa phải chạy test trên thiết bị.
 
-Xem [cách chọn FCM/polling](16-fcm-to-polling-fallback.md) và [luồng FCM bật âm thanh](20-fcm-to-pda-alarm-guide.md).
+Xem [hướng dẫn polling tới chuông/rung PDA](26-polling-to-pda-alarm-guide.md), [cách chọn FCM/polling](16-fcm-to-polling-fallback.md) và [luồng FCM bật âm thanh](20-fcm-to-pda-alarm-guide.md).

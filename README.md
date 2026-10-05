@@ -28,6 +28,8 @@ For step-by-step Firebase, backend, Android permissions and PDA sound setup, see
 
 Android receives finder commands through FCM by default (`finderTransport=fcm` in `pda-android/gradle.properties`). FCM errors do not switch it to polling. To explicitly use HTTP polling, build with `./gradlew assembleDebug -PfinderTransport=polling` and install that APK on the target PDA. See [transport configuration](docs/16-fcm-to-polling-fallback.md).
 
+For the current polling flow, API timing, command handling, and Android finder sound/vibration, see [polling and PDA alarm guide (Vietnamese)](docs/26-polling-to-pda-alarm-guide.md).
+
 ## Source layout
 
 `pda-web/` is the basic React finder website: all stores/devices, Find/Stop and status updates, without login. Run `npm ci` and `npm run dev` there, then open http://localhost:5173. Android registers the PDA after employee/manager login and receives alarms; it no longer offers remote device finding. See [web setup and API](docs/21-react-device-finder.md). The `/web/finder/**` API is intentionally public across stores; deploy it within the intended internal network.

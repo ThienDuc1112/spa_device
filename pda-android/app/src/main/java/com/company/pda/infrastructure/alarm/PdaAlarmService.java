@@ -23,6 +23,7 @@ public class PdaAlarmService extends Service {
   private com.company.device.api.DeviceAlarmAdapter adapter;
   private String requestId;
   private boolean failed;
+  private Vibrator vibrator;
   private final Handler audioMonitor = new Handler(Looper.getMainLooper());
 
   private static void channel(Context c) {
@@ -138,6 +139,7 @@ public class PdaAlarmService extends Service {
             "android.resource://" + getPackageName() + "/raw/pda_alarm", deadline, true);
     var result = adapter.start(policy, () -> failAlarm("Alarm interrupted: audio focus lost"));
     if (result.ringing()) {
+      startVibration();
       SyncWorker.event(app, requestId, "RINGING");
       sendBroadcast(new Intent(SHOW).setPackage(getPackageName()));
       timeout.schedule(policy, this::stopSelf);
@@ -155,6 +157,46 @@ public class PdaAlarmService extends Service {
     else audioMonitor.postDelayed(this::checkAudio, 500);
   }
 
+  private void startVibration() {
+    try {
+      if (Build.VERSION.SDK_INT >= 31) {
+        var manager = getSystemService(VibratorManager.class);
+        vibrator = manager == null ? null : manager.getDefaultVibrator();
+      } else {
+        vibrator = getSystemService(Vibrator.class);
+      }
+      if (vibrator == null || !vibrator.hasVibrator()) {
+        vibrator = null;
+        return;
+      }
+      // Repeat: vibrate 500 ms, pause 500 ms, until the alarm session is released.
+      var effect = VibrationEffect.createWaveform(new long[] {0, 500, 500}, 0);
+      if (Build.VERSION.SDK_INT >= 33) {
+        vibrator.vibrate(
+            effect,
+            new VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_ALARM).build());
+      } else {
+        vibrator.vibrate(
+            effect,
+            new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
+      }
+    } catch (RuntimeException e) {
+      // Vibration is supplementary: unsupported hardware/policy must not stop the sound.
+      android.util.Log.w("PdaAlarm", "Finder vibration unavailable", e);
+    }
+  }
+
+  private void stopVibration() {
+    if (vibrator == null) return;
+    try {
+      vibrator.cancel();
+    } catch (RuntimeException e) {
+      android.util.Log.w("PdaAlarm", "Cannot cancel finder vibration", e);
+    } finally {
+      vibrator = null;
+    }
+  }
+
   private void failAlarm(String reason) {
     if (requestId == null || failed) return;
     failed = true;
@@ -170,6 +212,7 @@ public class PdaAlarmService extends Service {
 
     timeout.cancel();
     audioMonitor.removeCallbacksAndMessages(null);
+    stopVibration();
     if (adapter != null) {
       adapter.stop();
       adapter = null;

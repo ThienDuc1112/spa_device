@@ -601,6 +601,7 @@ Tài liệu mô tả code đang có; không khẳng định đã thử giao FCM 
 
 ## 14. Các tài liệu liên quan
 
+- [Polling và chuông/rung khi tìm PDA](26-polling-to-pda-alarm-guide.md) — cơ chế rung dùng chung cho FCM và polling.
 - [Trách nhiệm từng class của Device Finder](19-device-finder-class-responsibilities.md)
 - [Luồng PDA Finder](14-device-finder-flow.md)
 - [Thiết lập âm thanh và kiểm thử trên PDA](12-finder-audio.md)
