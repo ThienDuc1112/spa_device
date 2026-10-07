@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.media.*;
 import android.os.*;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.company.pda.PdaApplication;
 import com.company.pda.infrastructure.firebase.SyncWorker;
@@ -11,6 +12,8 @@ import com.company.pda.presentation.home.HomeActivity;
 
 public class PdaAlarmService extends Service {
 
+  private static final String TAG = "PdaAlarm";
+  private long lastAudioLogMs;
   public static volatile String activeId;
 
   public static final String SHOW = "com.company.pda.SHOW_ALARM";
@@ -57,6 +60,7 @@ public class PdaAlarmService extends Service {
   }
 
   public static void notifyFallback(Context c, String id) {
+    Log.w(TAG, "show fallback notification requestId=" + id);
 
     try {
 
@@ -67,15 +71,24 @@ public class PdaAlarmService extends Service {
                   .setAutoCancel(true)
                   .build());
 
-    } catch (SecurityException ignored) {
-
+    } catch (SecurityException error) {
+      Log.e(TAG, "fallback notification denied requestId=" + id, error);
     }
   }
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
 
+    Log.i(
+        TAG,
+        "onStartCommand startId="
+            + startId
+            + " action="
+            + (intent == null ? null : intent.getAction())
+            + " activeId="
+            + activeId);
     if (intent == null) {
+      Log.w(TAG, "stopping: null restart intent");
 
       stopSelf();
 
@@ -83,6 +96,7 @@ public class PdaAlarmService extends Service {
     }
 
     if ("STOP".equals(intent.getAction())) {
+      Log.i(TAG, "stopping: notification STOP requestId=" + requestId);
 
       stopSelf();
 
@@ -92,6 +106,14 @@ public class PdaAlarmService extends Service {
     String incoming = intent.getStringExtra("requestId");
 
     long deadline = intent.getLongExtra("expiresAt", 0);
+    Log.i(
+        TAG,
+        "incoming requestId="
+            + incoming
+            + " deadlineMs="
+            + deadline
+            + " nowMs="
+            + System.currentTimeMillis());
 
     var app = (PdaApplication) getApplication();
 
@@ -115,16 +137,35 @@ public class PdaAlarmService extends Service {
           android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
     else startForeground(NOTIFICATION, alert);
 
+    Log.i(
+        TAG,
+        "foreground alarm started requestId="
+            + incoming
+            + " notificationsEnabled="
+            + getSystemService(NotificationManager.class).areNotificationsEnabled());
     if (incoming == null
         || deadline <= System.currentTimeMillis()
         || app.modules().tokens.get("handled:" + incoming) != null) {
 
+      Log.w(
+          TAG,
+          "rejected requestId="
+              + incoming
+              + " missingId="
+              + (incoming == null)
+              + " expired="
+              + (deadline <= System.currentTimeMillis())
+              + " handled="
+              + (incoming != null && app.modules().tokens.get("handled:" + incoming) != null));
       if (requestId == null) stopSelf();
 
       return START_NOT_STICKY;
     }
 
-    if (incoming.equals(requestId)) return START_NOT_STICKY;
+    if (incoming.equals(requestId)) {
+      Log.d(TAG, "ignored duplicate active requestId=" + incoming);
+      return START_NOT_STICKY;
+    }
 
     release();
 
@@ -137,12 +178,34 @@ public class PdaAlarmService extends Service {
     var policy =
         new com.company.device.api.AlarmPolicy(
             "android.resource://" + getPackageName() + "/raw/pda_alarm", deadline, true);
+    Log.i(
+        TAG,
+        "audio adapter="
+            + adapter.getClass().getSimpleName()
+            + " requestId="
+            + requestId
+            + " remainingMs="
+            + (deadline - System.currentTimeMillis()));
     var result = adapter.start(policy, () -> failAlarm("Alarm interrupted: audio focus lost"));
+    Log.i(
+        TAG,
+        "audio start result requestId="
+            + requestId
+            + " status="
+            + result.status()
+            + " detail="
+            + result.message());
     if (result.ringing()) {
       startVibration();
       SyncWorker.event(app, requestId, "RINGING");
       sendBroadcast(new Intent(SHOW).setPackage(getPackageName()));
-      timeout.schedule(policy, this::stopSelf);
+      Log.i(TAG, "schedule timeout requestId=" + requestId + " deadlineMs=" + deadline);
+      timeout.schedule(
+          policy,
+          () -> {
+            Log.i(TAG, "stopping: deadline reached requestId=" + requestId);
+            stopSelf();
+          });
       audioMonitor.postDelayed(this::checkAudio, 500);
     } else {
       failAlarm(result.message());
@@ -153,6 +216,18 @@ public class PdaAlarmService extends Service {
   private void checkAudio() {
     if (adapter == null || failed) return;
     var result = adapter.check();
+    long now = SystemClock.elapsedRealtime();
+    if (!result.ringing() || now - lastAudioLogMs >= 10000) {
+      Log.d(
+          TAG,
+          "audio health requestId="
+              + requestId
+              + " status="
+              + result.status()
+              + " detail="
+              + result.message());
+      lastAudioLogMs = now;
+    }
     if (!result.ringing()) failAlarm(result.message());
     else audioMonitor.postDelayed(this::checkAudio, 500);
   }
@@ -166,6 +241,7 @@ public class PdaAlarmService extends Service {
         vibrator = getSystemService(Vibrator.class);
       }
       if (vibrator == null || !vibrator.hasVibrator()) {
+        Log.w(TAG, "vibration unavailable: no vibrator hardware requestId=" + requestId);
         vibrator = null;
         return;
       }
@@ -177,12 +253,17 @@ public class PdaAlarmService extends Service {
             new VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_ALARM).build());
       } else {
         vibrator.vibrate(
-            effect,
-            new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
+            effect, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
       }
+      Log.i(
+          TAG,
+          "vibration requested requestId="
+              + requestId
+              + " patternMs=500/500 sdk="
+              + Build.VERSION.SDK_INT);
     } catch (RuntimeException e) {
       // Vibration is supplementary: unsupported hardware/policy must not stop the sound.
-      android.util.Log.w("PdaAlarm", "Finder vibration unavailable", e);
+      android.util.Log.w("PdaAlarm", "Finder vibration unavailable requestId=" + requestId, e);
     }
   }
 
@@ -190,6 +271,7 @@ public class PdaAlarmService extends Service {
     if (vibrator == null) return;
     try {
       vibrator.cancel();
+      Log.i(TAG, "vibration cancelled requestId=" + requestId);
     } catch (RuntimeException e) {
       android.util.Log.w("PdaAlarm", "Cannot cancel finder vibration", e);
     } finally {
@@ -199,6 +281,7 @@ public class PdaAlarmService extends Service {
 
   private void failAlarm(String reason) {
     if (requestId == null || failed) return;
+    Log.e(TAG, "alarm failed requestId=" + requestId + " reason=" + reason);
     failed = true;
     SyncWorker.event((PdaApplication) getApplication(), requestId, "FAILED");
     getSharedPreferences("finder_sound", MODE_PRIVATE)
@@ -210,10 +293,12 @@ public class PdaAlarmService extends Service {
 
   private void release() {
 
+    Log.i(TAG, "release requestId=" + requestId + " failed=" + failed);
     timeout.cancel();
     audioMonitor.removeCallbacksAndMessages(null);
     stopVibration();
     if (adapter != null) {
+      Log.i(TAG, "audio stop requestId=" + requestId);
       adapter.stop();
       adapter = null;
     }
@@ -231,6 +316,7 @@ public class PdaAlarmService extends Service {
 
   @Override
   public void onDestroy() {
+    Log.i(TAG, "onDestroy requestId=" + requestId);
 
     release();
 

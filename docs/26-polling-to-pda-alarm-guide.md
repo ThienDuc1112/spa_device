@@ -113,7 +113,40 @@ Polling dùng foreground service loại `specialUse` và partial wake lock có l
 6. Kiểm tra FIND lặp, STOP trước FIND, credential sai, DND và máy không hỗ trợ rung. FIND lặp không khởi động lại mẫu rung; máy không hỗ trợ rung vẫn phát chuông nếu audio cho phép.
 7. Build lại `-PfinderTransport=fcm`, cài và mở Home: polling dừng; FIND qua FCM vẫn phát chuông kèm rung qua cùng service.
 
-## 7. Các file liên quan
+## 7. Log chẩn đoán chức năng tìm PDA
+
+Build và cài lại APK đã có log. Kết nối PDA với máy tính, bật USB debugging rồi chạy từ terminal có `adb` trong PATH:
+
+```powershell
+adb devices
+adb logcat -v threadtime 'FinderPolling:V' 'FinderFcm:V' 'FinderCommand:V' 'PdaAlarm:V' 'FinderAudio:V' 'FinderSync:V' 'AndroidRuntime:E' '*:S' | Tee-Object -FilePath pda-finder-log.txt
+```
+
+Chạy lệnh trước khi mở Home và bấm Tìm trên website; bấm Ctrl+C sau khi tái hiện lỗi. Nếu có nhiều thiết bị, thêm `-s <serial>` sau `adb`. Trong Android Studio Logcat, chọn thiết bị/app `com.company.pda`, mức Verbose và lọc theo các tag trong bảng. File xuất nằm trong thư mục terminal hiện tại.
+
+| Tag | Nội dung cần kiểm tra |
+| --- | --- |
+| `FinderPolling` | Transport lúc build, đăng ký thiết bị, foreground service, quyền thông báo, wake lock; số lượt `poll`, host/port/scheme đích, thời gian HTTP, số lệnh, mã HTTP lỗi và thời gian chờ retry. |
+| `FinderFcm` | Có nhận message hay không, transport, priority thực tế/gốc, requestId/command/deadline; token chỉ log sự kiện refresh. |
+| `FinderCommand` | UUID/deadline sai, hết hạn, đã xử lý/đang chạy, command không hỗ trợ, fallback hoặc lỗi gọi service. |
+| `PdaAlarm` | Request vào service, foreground thành công, adapter được chọn, kết quả audio, kiểm tra audio mỗi 10 giây hoặc ngay khi thất bại, rung, timeout, STOP và cleanup. |
+| `FinderAudio` | DND/ringer mode, xin/mất audio focus, âm lượng trước/sau, nguồn âm thanh, prepare/start MediaPlayer, chọn loa và khôi phục âm lượng. |
+| `FinderSync` | Ghi event vào Room, enqueue workId, lần retry, gửi ACK theo requestId/status, thành công/lỗi HTTP và xóa event khỏi hàng đợi. |
+
+Với một lượt tìm thành công, tra cùng `requestId` theo thứ tự: `FinderCommand received` → `dispatch FIND` → `PdaAlarm controller startForegroundService` → `incoming` → `FinderAudio` → `audio start result status=RINGING` → `vibration requested` → `FinderSync event persisted status=RINGING` → `event ACK succeeded`. Các log audio không có requestId; đối chiếu thời gian giữa log bắt đầu adapter và kết quả audio của service. Thử loa cũng dùng tag `FinderAudio`.
+
+- Không có `start requested`: kiểm tra đã mở Home/đăng ký thiết bị và cài APK mới.
+- `polling disabled` hoặc FCM `ignored`: kiểm tra transport lúc build APK.
+- Polling `commands=0`: thiết bị chưa nhận lệnh; đối chiếu deviceId và request còn hạn trên backend. Kiểm tra host/port/scheme, lỗi mạng/timeout và HTTP 401/403 để phân biệt URL, kết nối và credential sai.
+- `expired` kèm `deadlineMs/nowMs`: đối chiếu deadline backend và giờ hệ thống PDA. `already handled or active` là chống lệnh trùng.
+- `foreground service start rejected`: xem exception, trạng thái app và quyền service. `notificationsEnabled=false` giải thích việc không thấy thông báo; riêng log này không chứng minh service không chạy.
+- `audio start result` hoặc `alarm failed`: xem `reason/detail` và bước `FinderAudio` cuối cùng, đặc biệt DND, audio focus, âm lượng và chọn loa. `MediaPlayer setup/start failed` có stack trace.
+- PDA có `RINGING` nhưng website chưa cập nhật: kiểm tra `event persisted`, `worker start`, `event ACK succeeded` hoặc HTTP/retry ở `FinderSync`. WorkManager chờ mạng có thể chưa chạy ngay.
+- `deadline reached`, `notification STOP`, `controller STOP`, audio focus change và `onDestroy` giúp xác định nguồn dừng. `onDestroy` đơn lẻ không xác định được lý do hệ điều hành hủy service; cần xem thêm log hệ thống.
+
+Log không ghi device secret, FCM token, header xác thực hoặc toàn bộ response body. Lỗi HTTP ghi mã trạng thái; lỗi mạng/Android có stack trace. Debug log polling xuất mỗi lượt, audio health tối đa mỗi 10 giây khi bình thường. `RINGING` và `vibration requested` xác nhận phần mềm đã yêu cầu phát/rung; vẫn cần kiểm tra loa/motor thực tế trên PDA.
+
+## 8. Các file liên quan
 
 | Thành phần | File |
 | --- | --- |
