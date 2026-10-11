@@ -175,7 +175,7 @@ Mở `http://localhost:5173`. Proxy mặc định trỏ tới `http://localhost:
 4. Bấm Stop trên web hoặc Stop alarm trên PDA; xác nhận chuông dừng.
 5. Tạo Find mới để thử khi app ở nền/màn hình khóa, rồi thử DND đã cho phép alarms.
 
-Thời hạn mặc định là 60 giây, có thể đổi bằng `FINDER_TIMEOUT_SECONDS` ở backend. Lệnh đã Stop/hết hạn không được dùng lại. Test notification từ Firebase Console không thay thế bước Find: app cần data message với `command`, `requestId`, `expiresAt` do backend tạo.
+Thời hạn mặc định là 900 giây (15 phút), có thể đổi bằng `FINDER_TIMEOUT_SECONDS` ở backend trong khoảng 10–900 giây. Lệnh đã Stop/hết hạn không được dùng lại. Test notification từ Firebase Console không thay thế bước Find: app cần data message với `command`, `requestId`, `expiresAt` do backend tạo.
 
 ## 8. Xác định lỗi theo điểm dừng
 

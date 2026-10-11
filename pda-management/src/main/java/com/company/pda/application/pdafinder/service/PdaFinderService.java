@@ -44,7 +44,7 @@ public class PdaFinderService implements FinderUseCase {
     this.identity = identity;
     this.ops = ops;
     this.actor = actor;
-    this.timeout = Math.max(10, Math.min(300, timeout));
+    this.timeout = Math.max(10, Math.min(900, timeout));
     this.fcmEnabled = fcmEnabled;
   }
 

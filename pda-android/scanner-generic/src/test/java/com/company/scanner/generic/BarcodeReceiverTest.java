@@ -72,7 +72,7 @@ public class BarcodeReceiverTest {
   public void leavesLengthValidationToUseCaseAndIgnoresLateDelivery() {
     var config = ScannerConfig.defaults(ScannerType.ZEBRA);
     var receiver = new BarcodeReceiver(config, callback);
-    String barcode = "A".repeat(100);
+    String barcode = String.join("", java.util.Collections.nCopies(100, "A"));
     var data = intent(config, barcode, "unused", null);
     receiver.onReceive(null, data);
     verify(callback).onScan(new ScanResult(barcode, "UNKNOWN"));

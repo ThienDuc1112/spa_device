@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt Android Studio để làm việc với dự án PDA
 
-Hướng dẫn dành cho Windows, đối chiếu cấu hình repository ngày 2026-09-29. Mục tiêu là mở dự án, đồng bộ thư viện, build APK và chạy trên emulator hoặc PDA thật. Tên một số menu có thể khác nhẹ giữa các phiên bản Android Studio.
+Hướng dẫn dành cho Windows, đối chiếu cấu hình repository ngày 2026-10-10. Mục tiêu là mở dự án, đồng bộ thư viện, build APK và chạy trên emulator hoặc PDA thật. Tên một số menu có thể khác nhẹ giữa các phiên bản Android Studio.
 
 ## 1. Cần cài những gì?
 
@@ -8,8 +8,8 @@ Hướng dẫn dành cho Windows, đối chiếu cấu hình repository ngày 20
 | --- | --- | --- |
 | Android Studio | Bắt buộc nếu làm việc bằng IDE này | Viết code, thiết kế giao diện, build và debug |
 | JDK 21 | Cấu hình đề xuất cho repository này | Chạy Gradle; backend dùng JDK 8 riêng |
-| Android SDK Platform 35 | Bắt buộc theo cấu hình hiện tại | Biên dịch app với `compileSdk 35` |
-| Android SDK Build-Tools 35.0.0 | Cần cho bộ công cụ AGP hiện tại | Đóng gói và xử lý APK |
+| Android SDK Platform 32 | Bắt buộc theo cấu hình hiện tại | Biên dịch app với `compileSdk 32` |
+| Android SDK Build-Tools 34.0.0 | Cần cho bộ công cụ AGP hiện tại | Đóng gói và xử lý APK |
 | Android SDK Platform-Tools | Cần để kết nối thiết bị | Cung cấp `adb` |
 | Android Emulator và một system image | Chỉ cần nếu dùng máy ảo | Chạy app khi không có PDA thật |
 | Driver USB phù hợp | Có thể cần trên Windows khi dùng thiết bị thật | Cho ADB nhận điện thoại/PDA |
@@ -18,7 +18,7 @@ Hướng dẫn dành cho Windows, đối chiếu cấu hình repository ngày 20
 | Docker Desktop | Tùy chọn nếu dùng Docker Compose cho backend | Chạy backend/database trong container |
 | Cấu hình Firebase | Chỉ cần khi thử FCM thật | Nhận/gửi push notification |
 
-Không cần cài Gradle toàn máy: repository có `gradlew.bat` để dùng đúng phiên bản. Các thư viện như Retrofit, Room, LiveData, Firebase và Compose được Gradle tải theo file build; không cài từng thư viện bằng bộ cài riêng.
+Không cần cài Gradle toàn máy: repository có `gradlew.bat` để dùng đúng phiên bản. Các thư viện như Retrofit, Room, LiveData, Firebase được Gradle tải theo file build; không cài từng thư viện bằng bộ cài riêng.
 
 ## 2. Cài Android Studio
 
@@ -55,12 +55,12 @@ AGP 8.9 yêu cầu tối thiểu JDK 17 và Gradle 8.11.1. Dùng JDK 21 ở đâ
 
 Mở **Tools → SDK Manager**; ở màn hình chào có thể mở qua **More Actions → SDK Manager**.
 
-Trong **SDK Platforms**, chọn **Android 15 / API Level 35**.
+Trong **SDK Platforms**, chọn **Android 12L / API Level 32**.
 
 Trong **SDK Tools**, chọn các mục cần dùng:
 
 ```text
-Android SDK Build-Tools → 35.0.0
+Android SDK Build-Tools → 34.0.0
 Android SDK Platform-Tools
 Android SDK Command-line Tools (latest)  [tiện khi dùng sdkmanager]
 Android Emulator                       [nếu chạy máy ảo]
@@ -112,20 +112,20 @@ Cấu hình đang khai báo trong repository:
 
 | Mục | Giá trị |
 | --- | --- |
-| Android Gradle Plugin | 8.9.1 |
+| Android Gradle Plugin | 8.2.2 |
 | Gradle Wrapper | 8.11.1 |
-| `compileSdk` / `targetSdk` | 35 / 35 |
+| `compileSdk` / `targetSdk` | 32 / 32 |
 | `minSdk` | 26, tương ứng Android 8.0 |
 | Java source/target compatibility | 17 |
 | JDK dùng để build theo README | 21 |
 | Application ID | `com.company.pda` |
-| AndroidX Activity | 1.10.1 cho cả `activity`, `activity-ktx`, `activity-compose` |
-| AndroidX Lifecycle | 2.8.7 |
-| Compose BOM | 2025.03.00 cho app và instrumentation test |
+| AndroidX Activity | 1.5.1 (`activity`) |
+| AndroidX Lifecycle | 2.5.1 |
+| Giao diện | Java/XML và View Binding |
 
 Nguồn: [build.gradle cấp project](../pda-android/build.gradle), [build.gradle module app](../pda-android/app/build.gradle), [Gradle Wrapper](../pda-android/gradle/wrapper/gradle-wrapper.properties).
 
-Các phiên bản AndroidX/Compose trên được chọn để dùng với SDK 35/AGP 8.9.1. Bộ Activity 1.13.0, Lifecycle 2.11.0 và Compose BOM 2026.02.01 trước đó kéo dependency yêu cầu SDK 36–37/AGP 9.1. Sau khi nhận thay đổi, chạy **Sync Project with Gradle Files**, rồi build lại. Khi thêm hoặc nâng thư viện, kiểm tra `:app:checkDebugAarMetadata`; cài lại Android Studio không tự sửa được sự không tương thích giữa dependency và SDK/AGP.
+Các phiên bản AndroidX được chọn để dùng với SDK 32/AGP 8.2.2; app dùng Java/XML và View Binding. Các Java record đã chuyển thành lớp bất biến vì SDK 32 chưa có java.lang.Record; constructor, accessor và so sánh giá trị được giữ lại. Sau khi nhận thay đổi, chạy **Sync Project with Gradle Files**, rồi build lại. Khi thêm hoặc nâng thư viện, kiểm tra `:app:checkDebugAarMetadata`; cài lại Android Studio không tự sửa được sự không tương thích giữa dependency và SDK/AGP.
 
 ## 6. Chọn chạy bằng emulator hoặc PDA thật
 
@@ -137,7 +137,7 @@ Trong Android Studio:
 
 1. Mở **Tools → Device Manager** hoặc **View → Tool Windows → Device Manager**.
 2. Chọn **Create Virtual Device** và một mẫu điện thoại.
-3. Chọn system image API 35 để thử cùng mức target của app; tải image phù hợp kiến trúc máy.
+3. Chọn system image API 32 để thử cùng mức target của app; tải image phù hợp kiến trúc máy.
 4. Chọn image có **Google Play** nếu cần thử FCM/Google Play services.
 5. Hoàn tất tạo AVD rồi nhấn nút Play để khởi động.
 
@@ -259,7 +259,7 @@ Sau khi tạo, dùng View Binding và gọi API/service trực tiếp trong Acti
 | Hiện tượng | Kiểm tra đầu tiên |
 | --- | --- |
 | `SDK location not found` | SDK Location và `pda-android/local.properties` |
-| Thiếu `android-35` hoặc Build-Tools | SDK Manager, chọn đúng package/version |
+| Thiếu `android-32` hoặc Build-Tools | SDK Manager, chọn đúng package/version |
 | `JAVA_HOME is not set` hoặc JDK quá cũ | Gradle JDK trong IDE và `JAVA_HOME` trong terminal |
 | `Unsupported class file major version` | JDK thực tế trong `gradlew.bat --version` và tương thích Gradle/plugin |
 | Không resolve được plugin/dependency | Internet, proxy nếu có, chế độ offline và phiên bản dependency được khai báo |
@@ -277,7 +277,7 @@ Khi báo lỗi, lấy thông báo lỗi đầu tiên trong Build Output hoặc L
 
 - [ ] Android Studio đã cài và mở được thư mục `pda-android`.
 - [ ] Gradle dùng JDK 21 theo cấu hình dự án.
-- [ ] SDK Platform 35, Build-Tools 35.0.0 và Platform-Tools đã cài.
+- [ ] SDK Platform 32, Build-Tools 34.0.0 và Platform-Tools đã cài.
 - [ ] Gradle Sync hoàn tất hoặc đã xác định rõ lỗi tương thích dependency cần xử lý.
 - [ ] `:app:assembleDebug` tạo được APK.
 - [ ] Emulator hoặc PDA thật đã được nhận và cài/chạy được app.

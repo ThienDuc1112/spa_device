@@ -208,7 +208,7 @@ public FindPdaResult findFromWeb(long deviceId) {
 
 `findForStore()` dùng chung với API manager cũ: xác minh thiết bị/cửa hàng, xử lý request cũ hết hạn, tạo request QUEUED, ghi log, outbox FIND và audit cùng transaction. Với web, requesterId là null, audit `PDA_FIND_WEB` có actor null; không mượn user đăng ký PDA để đại diện người dùng web. Migration V7 cho phép requester_id null.
 
-`timeout` mặc định 60 giây, giới hạn 10–300 giây. Chỉ một request active trên mỗi PDA; trùng còn hạn trả 409. API trả QUEUED chưa có nghĩa FCM đã gửi. Cửa hàng lấy từ database, không từ giá trị web cung cấp. API manager cũ vẫn yêu cầu JWT và giới hạn cửa hàng.
+`timeout` mặc định 900 giây (15 phút), giới hạn 10–900 giây. Chỉ một request active trên mỗi PDA; trùng còn hạn trả 409. API trả QUEUED chưa có nghĩa FCM đã gửi. Cửa hàng lấy từ database, không từ giá trị web cung cấp. API manager cũ vẫn yêu cầu JWT và giới hạn cửa hàng.
 
 Chi tiết website, API và đăng ký mới: [21-react-device-finder.md](21-react-device-finder.md).
 
@@ -555,7 +555,7 @@ Chi tiết: [15-finder-polling.md](15-finder-polling.md), [16-fcm-to-polling-fal
 3. Kiểm tra loa/DND bằng nút test âm thanh 5 giây.
 4. Chạy `npm ci` và `npm run dev` trong `pda-web`, mở http://localhost:5173, chọn cửa hàng/thiết bị rồi bấm **Tìm** (không đăng nhập web).
 5. Kiểm tra backend đã tạo request/outbox và có `PUSH_FIND`.
-6. Đặt breakpoint ở `PdaFirebaseMessagingService.onMessageReceived()` để xác nhận message thực sự đến qua FCM. Kiểm tra `command`, `requestId`, `expiresAt` và priority. Không giữ breakpoint quá deadline; nếu cần, tăng `app.finder-timeout-seconds` tối đa 300 khi debug.
+6. Đặt breakpoint ở `PdaFirebaseMessagingService.onMessageReceived()` để xác nhận message thực sự đến qua FCM. Kiểm tra `command`, `requestId`, `expiresAt` và priority. Không giữ breakpoint quá deadline; nếu cần, tăng `app.finder-timeout-seconds` tối đa 900 khi debug.
 7. Tiếp tục chạy, quan sát foreground notification, tiếng chuông và trạng thái tự cập nhật trên website để thấy `RINGING`.
 8. Bấm **Dừng** trên web và Stop alarm tại máy đích trong hai lượt test riêng; thử để tự hết hạn.
 9. Thử app ở nền/khóa màn hình sau khi luồng foreground đã ổn; kiểm tra chính sách pin của thiết bị. Mở app lại sau force-stop trước khi test.

@@ -19,10 +19,15 @@ public final class ScannerModule {
     String extra = prefs.getString("extra", defaults.dataExtra());
     // Older Zebra EMDK settings allowed empty intent fields.
     if (type == ScannerType.ZEBRA) {
-      if (action.isBlank()) action = defaults.action();
-      if (extra.isBlank()) extra = defaults.dataExtra();
+      if (action.codePoints().allMatch(Character::isWhitespace)) action = defaults.action();
+      if (extra.codePoints().allMatch(Character::isWhitespace)) extra = defaults.dataExtra();
     }
-    var config = new ScannerConfig(type, action, extra, permission.isBlank() ? null : permission);
+    var config =
+        new ScannerConfig(
+            type,
+            action,
+            extra,
+            permission.codePoints().allMatch(Character::isWhitespace) ? null : permission);
     return ScannerFactory.forAndroid(context).create(config);
   }
 }

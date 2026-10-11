@@ -5,7 +5,6 @@ import static org.mockito.Mockito.*;
 
 import android.content.Context;
 import android.content.IntentFilter;
-import androidx.core.content.ContextCompat;
 import com.company.scanner.api.*;
 import java.util.ArrayList;
 import org.junit.Test;
@@ -17,20 +16,15 @@ public class IntentScannerManagerTest {
     when(context.getApplicationContext()).thenReturn(context);
     ScanCallback callback = mock(ScanCallback.class);
     var registered = new ArrayList<BarcodeReceiver>();
-    try (var compat = mockStatic(ContextCompat.class)) {
-      compat
-          .when(
-              () ->
-                  ContextCompat.registerReceiver(
-                      eq(context),
-                      any(BarcodeReceiver.class),
-                      any(IntentFilter.class),
-                      eq("vendor.permission"),
-                      isNull(),
-                      eq(ContextCompat.RECEIVER_EXPORTED)))
+    {
+      when(context.registerReceiver(
+              any(BarcodeReceiver.class),
+              any(IntentFilter.class),
+              eq("vendor.permission"),
+              isNull()))
           .thenAnswer(
               call -> {
-                registered.add(call.getArgument(1));
+                registered.add(call.getArgument(0));
                 return null;
               });
       var manager =
@@ -50,17 +44,9 @@ public class IntentScannerManagerTest {
     Context context = mock(Context.class);
     when(context.getApplicationContext()).thenReturn(context);
     ScanCallback callback = mock(ScanCallback.class);
-    try (var compat = mockStatic(ContextCompat.class)) {
-      compat
-          .when(
-              () ->
-                  ContextCompat.registerReceiver(
-                      eq(context),
-                      any(BarcodeReceiver.class),
-                      any(IntentFilter.class),
-                      isNull(),
-                      isNull(),
-                      eq(ContextCompat.RECEIVER_EXPORTED)))
+    {
+      when(context.registerReceiver(
+              any(BarcodeReceiver.class), any(IntentFilter.class), isNull(), isNull()))
           .thenThrow(new SecurityException("denied"));
       var manager = new IntentScannerManager(context, ScannerConfig.defaults(ScannerType.INTENT));
       manager.start(callback);

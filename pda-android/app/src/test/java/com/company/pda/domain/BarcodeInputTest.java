@@ -19,6 +19,8 @@ public class BarcodeInputTest {
 
   @Test
   public void rejectsOversizedPayload() {
-    assertThrows(IllegalArgumentException.class, () -> BarcodeInput.normalize("1".repeat(51)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> BarcodeInput.normalize(String.join("", java.util.Collections.nCopies(51, "1"))));
   }
 }

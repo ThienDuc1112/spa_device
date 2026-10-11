@@ -23,8 +23,7 @@ public class NavigationTest {
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
           .getUiAutomation()
-          .grantRuntimePermission(
-              app.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
+          .grantRuntimePermission(app.getPackageName(), "android.permission.POST_NOTIFICATIONS");
     }
   }
 

@@ -3,7 +3,6 @@ package com.company.scanner.generic;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import androidx.core.content.ContextCompat;
 import com.company.scanner.api.*;
 import java.util.Objects;
 import java.util.Set;
@@ -24,9 +23,9 @@ public class IntentScannerManager implements ScannerManager {
     Objects.requireNonNull(callback, "callback");
     stop();
     if (config.action() == null
-        || config.action().isBlank()
+        || config.action().codePoints().allMatch(Character::isWhitespace)
         || config.dataExtra() == null
-        || config.dataExtra().isBlank()) {
+        || config.dataExtra().codePoints().allMatch(Character::isWhitespace)) {
       callback.onError("Configure scanner action and payload key");
       return;
     }
@@ -34,13 +33,7 @@ public class IntentScannerManager implements ScannerManager {
     IntentFilter filter = new IntentFilter(config.action());
     filter.addCategory(Intent.CATEGORY_DEFAULT);
     try {
-      ContextCompat.registerReceiver(
-          context,
-          candidate,
-          filter,
-          config.senderPermission(),
-          null,
-          ContextCompat.RECEIVER_EXPORTED);
+      context.registerReceiver(candidate, filter, config.senderPermission(), null);
       receiver = candidate;
     } catch (RuntimeException error) {
       candidate.deactivate();

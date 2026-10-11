@@ -50,7 +50,7 @@ public final class BarcodeReceiver extends BroadcastReceiver {
       } else {
         return;
       }
-      if (value.isBlank()) return;
+      if (value.codePoints().allMatch(Character::isWhitespace)) return;
       String typeKey =
           switch (config.type()) {
             case ZEBRA -> "com.symbol.datawedge.label_type";
@@ -60,7 +60,7 @@ public final class BarcodeReceiver extends BroadcastReceiver {
           };
       Object symbology = extras.get(typeKey);
       String label =
-          symbology instanceof String text && !text.isBlank()
+          symbology instanceof String text && !text.codePoints().allMatch(Character::isWhitespace)
               ? text
               : symbology instanceof Number number ? number.toString() : "UNKNOWN";
       result = new ScanResult(value, label);

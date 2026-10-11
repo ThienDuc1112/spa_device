@@ -2,11 +2,9 @@ package com.company.pda.presentation.home;
 
 import static com.company.pda.common.util.ApiCalls.execute;
 
-import android.Manifest;
 import android.content.*;
 import android.os.*;
 import android.widget.*;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import com.company.pda.PdaApplication;
@@ -88,13 +86,7 @@ public class HomeActivity extends AlarmAwareActivity {
                 else navigate("product");
               }
             });
-    if (Build.VERSION.SDK_INT >= 33)
-      registerForActivityResult(
-              new ActivityResultContracts.RequestPermission(),
-              allowed -> {
-                if (!allowed) tasks.status.setValue("Allow notifications to see finder alerts");
-              })
-          .launch(Manifest.permission.POST_NOTIFICATIONS);
+    // With targetSdk 32, Android 13+ controls the notification permission prompt.
   }
 
   public void navigate(String screen) {
@@ -193,8 +185,12 @@ public class HomeActivity extends AlarmAwareActivity {
               String selected = types[type.getSelectedItemPosition()];
               if (!selected.equals("CAMERA")
                   && !selected.equals("KEYBOARD")
-                  && (action.getText().toString().isBlank()
-                      || extra.getText().toString().isBlank())) {
+                  && (action.getText().toString().codePoints().allMatch(Character::isWhitespace)
+                      || extra
+                          .getText()
+                          .toString()
+                          .codePoints()
+                          .allMatch(Character::isWhitespace))) {
                 tasks.status.setValue("Scanner action and payload key are required");
                 return;
               }

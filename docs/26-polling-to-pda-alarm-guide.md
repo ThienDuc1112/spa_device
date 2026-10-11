@@ -4,6 +4,12 @@ Tài liệu mô tả cơ chế đang triển khai trong dự án: Android chủ 
 
 ## 1. Cấu hình và chạy thử
 
+Lệnh tìm mặc định sống **15 phút** kể từ lúc bấm Tìm, cấu hình backend bằng `FINDER_TIMEOUT_SECONDS=900` (giới hạn 10–900 giây). FCM dùng TTL bằng thời gian còn lại của lệnh; polling chỉ trả lệnh còn hạn. Ví dụ bấm Tìm lúc 10:00, PDA có mạng lại lúc 10:10 thì lệnh vẫn còn hạn đến 10:15. Khả năng nhận qua FCM còn phụ thuộc kết nối Firebase và trạng thái app; polling cần service đang chạy. Sau reboot/force-stop, mở lại Home để khởi động polling.
+
+Thời gian chờ nhận lệnh khác thời gian phát chuông: chuông/rung vẫn tối đa **5 phút từ lúc bắt đầu**, và không vượt `expiresAt`. Nếu nhận lúc 10:14 thì chỉ còn khoảng 1 phút để phát chuông. Hết 15 phút, cần bấm Tìm lại. Sau khi đổi cấu hình, restart backend; với Docker Compose, tạo lại container backend để nhận biến môi trường mới.
+
+Android được cấu hình `compileSdk 32`, `targetSdk 32`, `minSdk 26`. Cài Android SDK Platform 32; Gradle vẫn dùng AGP 8.2.2 và Build-Tools 34.0.0. Với Android 13 trở lên, hệ thống quản lý thời điểm hỏi quyền thông báo cho app target 32; kiểm tra quyền thông báo trong Settings nếu không thấy thông báo polling/chuông.
+
 Từ thư mục `pda-android`, build APK cho PDA cần tìm:
 
 ```powershell
@@ -47,7 +53,7 @@ sequenceDiagram
     PDA->>API: POST /pda/events: STOPPED qua SyncWorker
 ```
 
-Backend mặc định đặt thời hạn tìm là 60 giây bằng `FINDER_TIMEOUT_SECONDS`; service giới hạn cấu hình trong khoảng 10–300 giây. Mỗi PDA chỉ có một request đang hoạt động; tạo thêm khi request cũ còn hoạt động trả HTTP 409.
+Backend mặc định đặt thời hạn tìm là 900 giây (15 phút) bằng `FINDER_TIMEOUT_SECONDS`; service giới hạn cấu hình trong khoảng 10–900 giây. Mỗi PDA chỉ có một request đang hoạt động; tạo thêm khi request cũ còn hoạt động trả HTTP 409.
 
 ## 3. API polling và nhịp gọi
 
@@ -95,7 +101,7 @@ Sự kiện `RINGING`, `STOPPED`, `FAILED` được ghi vào Room rồi gửi `P
 
 Trong [PdaAlarmService](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/PdaAlarmService.java), sau khi alarm adapter trả kết quả đang reo, service bắt đầu rung theo mẫu **rung 500 ms, nghỉ 500 ms**, lặp đến khi phiên được giải phóng. Manifest khai báo `android.permission.VIBRATE`; không có hộp thoại xin quyền runtime cho quyền này.
 
-Android 12 trở lên lấy bộ rung mặc định qua `VibratorManager`; Android 8–11 lấy `Vibrator`. Android 13 trở lên dùng `VibrationAttributes.USAGE_ALARM`, bản cũ dùng `AudioAttributes.USAGE_ALARM` để gắn rung với báo động. Xem API chính thức: [Vibrator](https://developer.android.com/reference/android/os/Vibrator), [VibratorManager](https://developer.android.com/reference/android/os/VibratorManager).
+Android 12 trở lên lấy bộ rung mặc định qua `VibratorManager`; Android 8–11 lấy `Vibrator`. Bản build SDK 32 dùng `AudioAttributes.USAGE_ALARM` để gắn rung với báo động trên các phiên bản Android. Xem API chính thức: [Vibrator](https://developer.android.com/reference/android/os/Vibrator), [VibratorManager](https://developer.android.com/reference/android/os/VibratorManager).
 
 Rung được hủy trong `release()`, cùng vòng đời chuông: dừng từ website, nút Stop alarm trên notification/giao diện, hết deadline, mất audio focus, lỗi kiểm tra âm thanh, thay phiên hoặc service bị hủy. Lệnh trùng/đã xử lý/hết hạn không bắt đầu rung mới.
 
@@ -103,7 +109,7 @@ Nếu máy không có motor rung hoặc API rung báo lỗi, chuông vẫn tiế
 
 ## 6. Chạy nền và kiểm tra trên PDA
 
-Polling dùng foreground service loại `specialUse` và partial wake lock có lease 10 phút, gia hạn mỗi vòng. Cấu hình EMM/OEM cần cho phép chạy nền và duy trì kết nối mạng khi khóa màn hình. `START_STICKY` không bảo đảm service luôn sống; sau force-stop hoặc reboot, mở lại Home vì chưa có boot receiver tự khởi động polling.
+Polling dùng foreground service và partial wake lock có lease 10 phút, gia hạn mỗi vòng. Cấu hình EMM/OEM cần cho phép chạy nền và duy trì kết nối mạng khi khóa màn hình. `START_STICKY` không bảo đảm service luôn sống; sau force-stop hoặc reboot, mở lại Home vì chưa có boot receiver tự khởi động polling.
 
 1. Cài APK polling, đăng ký PDA, mở Home và kiểm tra notification polling.
 2. Trên website chọn đúng PDA rồi bấm Tìm: máy phát chuông và rung 500/500 ms; trạng thái chuyển sang `RINGING` khi ACK tới backend.

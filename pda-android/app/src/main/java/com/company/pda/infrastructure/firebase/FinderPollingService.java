@@ -2,7 +2,6 @@ package com.company.pda.infrastructure.firebase;
 
 import android.app.*;
 import android.content.*;
-import android.content.pm.ServiceInfo;
 import android.os.*;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
@@ -91,9 +90,7 @@ public final class FinderPollingService extends Service {
             .setOngoing(true)
             .setSilent(true)
             .build();
-    if (Build.VERSION.SDK_INT >= 34)
-      startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-    else startForeground(NOTIFICATION, notification);
+    startForeground(NOTIFICATION, notification);
     Log.i(TAG, "foreground started");
     if (!((PdaApplication) getApplication()).modules().device.registered()) {
       Log.w(TAG, "stopping: device not registered");

@@ -247,14 +247,8 @@ public class PdaAlarmService extends Service {
       }
       // Repeat: vibrate 500 ms, pause 500 ms, until the alarm session is released.
       var effect = VibrationEffect.createWaveform(new long[] {0, 500, 500}, 0);
-      if (Build.VERSION.SDK_INT >= 33) {
-        vibrator.vibrate(
-            effect,
-            new VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_ALARM).build());
-      } else {
-        vibrator.vibrate(
-            effect, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
-      }
+      vibrator.vibrate(
+          effect, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
       Log.i(
           TAG,
           "vibration requested requestId="

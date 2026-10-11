@@ -2,7 +2,6 @@ package com.company.pda.common.util;
 
 import android.content.*;
 import androidx.appcompat.app.*;
-import androidx.core.content.ContextCompat;
 import com.company.pda.infrastructure.alarm.PdaAlarmService;
 
 public abstract class AlarmAwareActivity extends AppCompatActivity {
@@ -16,11 +15,11 @@ public abstract class AlarmAwareActivity extends AppCompatActivity {
 
   protected void onResume() {
     super.onResume();
-    ContextCompat.registerReceiver(
-        this,
+    registerReceiver(
         receiver,
         new IntentFilter(PdaAlarmService.SHOW),
-        ContextCompat.RECEIVER_NOT_EXPORTED);
+        getPackageName() + ".permission.FINDER_INTERNAL",
+        null);
     showAlarm();
   }
 

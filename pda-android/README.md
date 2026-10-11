@@ -44,9 +44,9 @@ flowchart TD
 
 ## Build and test
 
-Use JDK 21 and Android SDK 35. Set `ANDROID_HOME` or an untracked `local.properties`.
+Use JDK 17 or 21 and Android SDK Platform 32. Set `ANDROID_HOME` or an untracked `local.properties`. The app uses `compileSdk 32`, `targetSdk 32`, and `minSdk 26`; AGP 8.2.2 still uses Build-Tools 34.0.0.
 
-The app keeps Activity at 1.10.1, Lifecycle at 2.8.7, and Compose BOM at 2025.03.00 to match `compileSdk 35` and AGP 8.9.1. App and instrumentation dependencies use the same Compose BOM. Updating these families independently can pull transitive AARs that require a newer SDK or AGP. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app. See the [Compose BOM documentation](https://developer.android.com/develop/ui/compose/bom).
+The Java/XML UI uses View Binding. Core library desugaring uses `desugar_jdk_libs 2.0.4`; Java data classes retain the former record constructors and accessors because SDK 32 lacks `java.lang.Record`. Activity 1.5.1, Lifecycle 2.5.1, Core 1.8.0, AppCompat 1.4.2, Fragment 1.5.1, Material 1.6.1, Room 2.4.3, WorkManager 2.7.1, and Firebase BOM 30.5.0 are selected for SDK 32 compatibility. Updating these families independently can pull transitive AARs that require a newer SDK. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app.
 
 ~~~sh
 ./gradlew :app:assembleDebug :app:assembleRelease

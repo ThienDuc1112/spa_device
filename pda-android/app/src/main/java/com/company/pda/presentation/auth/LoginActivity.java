@@ -42,7 +42,8 @@ public class LoginActivity extends AlarmAwareActivity {
   }
 
   private void login(String username, String password) {
-    if (username.isBlank() || password.isBlank()) {
+    if (username.codePoints().allMatch(Character::isWhitespace)
+        || password.codePoints().allMatch(Character::isWhitespace)) {
       tasks.error.setValue("Enter username and password");
       return;
     }

@@ -66,8 +66,7 @@ public class FinderCommandTest {
       if (android.os.Build.VERSION.SDK_INT >= 33)
         InstrumentationRegistry.getInstrumentation()
             .getUiAutomation()
-            .grantRuntimePermission(
-                app.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
+            .grantRuntimePermission(app.getPackageName(), "android.permission.POST_NOTIFICATIONS");
       try (var scenario =
           androidx.test.core.app.ActivityScenario.launch(
               com.company.pda.presentation.pdafinder.FinderSoundActivity.class)) {
