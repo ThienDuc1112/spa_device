@@ -1,27 +1,55 @@
 package com.company.pda.data.remote.api;
 
+import com.company.pda.common.util.ApiCalls;
 import com.company.pda.data.remote.dto.pdafinder.PdaFinderDto.*;
+import com.google.gson.reflect.TypeToken;
 import java.util.List;
-import retrofit2.Call;
-import retrofit2.http.*;
+import java.util.Map;
 
-public interface PdaFinderApi {
-  @GET("pda/fcm-health")
-  Call<FcmHealth> fcmHealth(
-      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret);
+public final class PdaFinderApi {
+  private final ApiCalls api;
 
-  @GET("pda/commands")
-  Call<List<Command>> commands(
-      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret);
+  public PdaFinderApi(ApiCalls api) {
+    this.api = api;
+  }
 
-  @POST("devices/register")
-  Call<Registration> register(@Body Register body);
+  public ApiCalls.Request<FcmHealth> fcmHealth(long id, String secret) {
+    return api.request(
+        "GET",
+        "pda/fcm-health",
+        null,
+        FcmHealth.class,
+        Map.of("X-Device-Id", Long.toString(id), "X-Device-Secret", secret));
+  }
 
-  @PUT("devices/token")
-  Call<Void> token(
-      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret, @Body Token body);
+  public ApiCalls.Request<List<Command>> commands(long id, String secret) {
+    return api.request(
+        "GET",
+        "pda/commands",
+        null,
+        new TypeToken<List<Command>>() {}.getType(),
+        Map.of("X-Device-Id", Long.toString(id), "X-Device-Secret", secret));
+  }
 
-  @POST("pda/events")
-  Call<Void> event(
-      @Header("X-Device-Id") long id, @Header("X-Device-Secret") String secret, @Body Event body);
+  public ApiCalls.Request<Registration> register(Register body) {
+    return api.request("POST", "devices/register", body, Registration.class);
+  }
+
+  public ApiCalls.Request<Void> token(long id, String secret, Token body) {
+    return api.request(
+        "PUT",
+        "devices/token",
+        body,
+        Void.class,
+        Map.of("X-Device-Id", Long.toString(id), "X-Device-Secret", secret));
+  }
+
+  public ApiCalls.Request<Void> event(long id, String secret, Event body) {
+    return api.request(
+        "POST",
+        "pda/events",
+        body,
+        Void.class,
+        Map.of("X-Device-Id", Long.toString(id), "X-Device-Secret", secret));
+  }
 }

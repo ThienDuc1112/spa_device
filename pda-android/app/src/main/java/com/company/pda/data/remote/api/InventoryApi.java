@@ -1,13 +1,20 @@
 package com.company.pda.data.remote.api;
 
+import com.company.pda.common.util.ApiCalls;
 import com.company.pda.data.remote.dto.inventory.InventoryDto;
-import retrofit2.Call;
-import retrofit2.http.*;
 
-public interface InventoryApi {
-  @GET("inventories/{code}")
-  Call<InventoryDto> inventory(@Path("code") String code);
+public final class InventoryApi {
+  private final ApiCalls api;
 
-  @POST("inventory-adjustments")
-  Call<InventoryDto> adjust(@Body InventoryDto.Adjustment body);
+  public InventoryApi(ApiCalls api) {
+    this.api = api;
+  }
+
+  public ApiCalls.Request<InventoryDto> inventory(String code) {
+    return api.request("GET", "inventories/" + ApiCalls.path(code), null, InventoryDto.class);
+  }
+
+  public ApiCalls.Request<InventoryDto> adjust(InventoryDto.Adjustment body) {
+    return api.request("POST", "inventory-adjustments", body, InventoryDto.class);
+  }
 }

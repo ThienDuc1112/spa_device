@@ -1,13 +1,20 @@
 package com.company.pda.data.remote.api;
 
+import com.company.pda.common.util.ApiCalls;
 import com.company.pda.data.remote.dto.auth.AuthDto.*;
-import retrofit2.Call;
-import retrofit2.http.*;
 
-public interface AuthApi {
-  @POST("auth/login")
-  Call<Tokens> login(@Body Login body);
+public final class AuthApi {
+  private final ApiCalls api;
 
-  @POST("auth/refresh")
-  Call<Tokens> refresh(@Body Refresh body);
+  public AuthApi(ApiCalls api) {
+    this.api = api;
+  }
+
+  public ApiCalls.Request<Tokens> login(Login body) {
+    return api.request("POST", "auth/login", body, Tokens.class);
+  }
+
+  public ApiCalls.Request<Tokens> refresh(Refresh body) {
+    return api.request("POST", "auth/refresh", body, Tokens.class);
+  }
 }

@@ -1,10 +1,16 @@
 package com.company.pda.data.remote.api;
 
+import com.company.pda.common.util.ApiCalls;
 import com.company.pda.data.remote.dto.product.ProductDto;
-import retrofit2.Call;
-import retrofit2.http.*;
 
-public interface ProductApi {
-  @GET("products/barcode/{barcode}")
-  Call<ProductDto> product(@Path("barcode") String barcode);
+public final class ProductApi {
+  private final ApiCalls api;
+
+  public ProductApi(ApiCalls api) {
+    this.api = api;
+  }
+
+  public ApiCalls.Request<ProductDto> product(String barcode) {
+    return api.request("GET", "products/barcode/" + ApiCalls.path(barcode), null, ProductDto.class);
+  }
 }

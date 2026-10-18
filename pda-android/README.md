@@ -38,7 +38,9 @@ flowchart TD
  deviceAndroid --> deviceApi[device-api]
 ~~~
 
-`di/AppModule` holds shared Retrofit API clients, preferences, Room and Android services. Activities and fragments call those services directly, without ViewModel, UseCase or Repository layers. `ScreenTasks` handles background execution and lifecycle-safe UI callbacks; it contains no business logic. Hardware modules never depend on `app`.
+`di/AppModule` holds shared HTTP API clients, preferences, Room and Android services. Activities and fragments call those services directly, without ViewModel, UseCase or Repository layers. `ScreenTasks` handles background execution and lifecycle-safe UI callbacks; it contains no business logic. Hardware modules never depend on `app`.
+
+`common/util/ApiCalls` uses `HttpURLConnection` and Gson for JSON requests. Endpoint clients explicitly provide the HTTP method, encoded path, body, response type and device headers. The util attaches JWTs to user requests and, on HTTP 401, serializes token refresh and retries once. A rejected refresh clears the current session; network/server errors preserve it. Auth and device-secret requests never trigger JWT refresh. Finder polling cancels its active request when the service stops.
 
 `LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use fragments that call API services directly. `HomeActivity` retains Scan Order state across fragment changes. Remote finder management now lives in the React website. Home prompts unregistered PDAs to register after login; local sound settings remain on Android. Firebase and alarm services live under `infrastructure`.
 

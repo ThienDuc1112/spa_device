@@ -1,6 +1,6 @@
 # 24. Android gọi service trực tiếp từ Activity/Fragment
 
-Android hiện không dùng ViewModel, UseCase hoặc Repository để chuyển tiếp nghiệp vụ. Mỗi màn hình gọi Retrofit API hoặc service Android trực tiếp. Backend giữ nguyên kiến trúc và API.
+Android hiện không dùng ViewModel, UseCase hoặc Repository để chuyển tiếp nghiệp vụ. Mỗi màn hình gọi HTTP API hoặc service Android trực tiếp. Backend giữ nguyên kiến trúc và API.
 
 | Thao tác | Nơi đọc/sửa code |
 | --- | --- |
@@ -33,13 +33,13 @@ tasks.run("Registering device…", () -> {
 
 ## Các tiện ích còn giữ
 
-- `AppModule`: khởi tạo và giữ Retrofit API client, database, preferences, `DeviceManager`, `AlarmController`, `FcmTokenManager`. Không chứa workflow màn hình.
+- `AppModule`: khởi tạo và giữ HTTP API client, database, preferences, `DeviceManager`, `AlarmController`, `FcmTokenManager`. Không chứa workflow màn hình.
 - `ScreenTasks`: chạy công việc nền, báo busy/error/retry và bỏ callback UI khi Activity hoặc view của Fragment đã bị hủy. Không chứa logic đăng ký, tồn kho hay disposal.
 - `ApiCalls`: kiểm tra HTTP response và chuyển lỗi API thành thông báo chung.
-- `TokenStorage`, Room, interceptor: tiếp tục lưu token/credential, refresh JWT, cache và đồng bộ ACK.
+- `TokenStorage`, Room, `ApiCalls`: tiếp tục lưu token/credential, refresh JWT, cache và đồng bộ ACK.
 - Module scanner/audio theo hãng: giữ để làm việc với thiết bị thật; màn hình gọi manager trực tiếp.
 
-Không gọi Retrofit `.execute()` trên UI thread. Không tự phát lại thao tác ghi khi xoay màn hình; nút Retry trong cùng màn hình giữ request ID đã tạo cho inventory/disposal. Sau khi rời màn hình trong lúc gửi, tải lại dữ liệu trước khi thao tác tiếp vì server có thể đã xử lý dù callback UI cũ bị bỏ.
+Không gọi `ApiCalls.execute(...)` trên UI thread. Không tự phát lại thao tác ghi khi xoay màn hình; nút Retry trong cùng màn hình giữ request ID đã tạo cho inventory/disposal. Sau khi rời màn hình trong lúc gửi, tải lại dữ liệu trước khi thao tác tiếp vì server có thể đã xử lý dù callback UI cũ bị bỏ.
 
 `HomeActivity` lưu danh sách barcode, sản phẩm đang chọn và màn hình hiện tại bằng `onSaveInstanceState`. `DisposalFragment` lưu trang/chi tiết rồi tải lại khi tạo view. Scanner bắt đầu ở `onResume`, dừng ở `onPause`; callback cũ không được dùng để tra sản phẩm sau khi màn hình ngừng hoạt động.
 

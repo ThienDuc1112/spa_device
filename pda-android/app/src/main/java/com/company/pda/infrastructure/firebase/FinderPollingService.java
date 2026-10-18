@@ -11,7 +11,7 @@ import com.company.pda.PdaApplication;
 import com.company.pda.common.exception.ApiException;
 import com.company.pda.presentation.home.HomeActivity;
 import java.util.concurrent.*;
-import retrofit2.Call;
+import com.company.pda.common.util.ApiCalls;
 
 /** Persistent finder transport for managed PDAs; requires fleet battery-policy configuration. */
 public final class FinderPollingService extends Service {
@@ -22,7 +22,7 @@ public final class FinderPollingService extends Service {
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
   private final Handler main = new Handler(Looper.getMainLooper());
   private volatile boolean destroyed;
-  private volatile Call<?> activeCall;
+  private volatile ApiCalls.Request<?> activeCall;
   private PowerManager.WakeLock wakeLock;
   private boolean started;
   private long delaySeconds = 5;
@@ -201,7 +201,7 @@ public final class FinderPollingService extends Service {
     }
   }
 
-  private <T> T execute(Call<T> call) throws java.io.IOException {
+  private <T> T execute(ApiCalls.Request<T> call) throws java.io.IOException {
     synchronized (this) {
       if (destroyed) throw new java.io.IOException("Finder monitor stopped");
       activeCall = call;
@@ -209,11 +209,11 @@ public final class FinderPollingService extends Service {
     Log.d(
         TAG,
         "HTTP send GET /pda/commands host="
-            + call.request().url().host()
+            + call.url().getHost()
             + " port="
-            + call.request().url().port()
+            + call.url().getPort()
             + " scheme="
-            + call.request().url().scheme());
+            + call.url().getProtocol());
     T body = com.company.pda.common.util.ApiCalls.execute(call);
     Log.d(TAG, "HTTP success GET /pda/commands bodyPresent=" + (body != null));
     return body;

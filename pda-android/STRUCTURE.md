@@ -66,9 +66,6 @@ pda-android/
 │   │   │   │               │       │   │   └── PdaFinderDto.java
 │   │   │   │               │       │   └── product
 │   │   │   │               │       │       └── ProductDto.java
-│   │   │   │               │       └── interceptor
-│   │   │   │               │           ├── AuthInterceptor.java
-│   │   │   │               │           └── TokenAuthenticator.java
 │   │   │   │               ├── di
 │   │   │   │               │   ├── AppModule.java
 │   │   │   │               │   ├── DatabaseModule.java

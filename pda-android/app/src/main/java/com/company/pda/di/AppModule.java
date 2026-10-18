@@ -27,12 +27,12 @@ public final class AppModule {
     tokens = new TokenStorage(context);
     database = DatabaseModule.provide(context);
     var network = NetworkModule.provide(tokens);
-    finderApi = network.create(PdaFinderApi.class);
+    finderApi = new PdaFinderApi(network);
     device = new DeviceManager(DeviceModule.info(context), tokens);
-    authApi = network.create(AuthApi.class);
-    productsApi = network.create(ProductApi.class);
-    inventoryApi = network.create(InventoryApi.class);
-    disposalsApi = network.create(DisposalApi.class);
+    authApi = new AuthApi(network);
+    productsApi = new ProductApi(network);
+    inventoryApi = new InventoryApi(network);
+    disposalsApi = new DisposalApi(network);
     alarm = new AlarmController(context, tokens);
     fcm = new FcmTokenManager(context, tokens);
   }

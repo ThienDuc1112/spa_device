@@ -8,7 +8,7 @@ import java.security.KeyStore;
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 
-public final class TokenStorage {
+public final class TokenStorage implements com.company.pda.common.util.ApiCalls.TokenStore {
 
   private final android.content.SharedPreferences prefs;
 
