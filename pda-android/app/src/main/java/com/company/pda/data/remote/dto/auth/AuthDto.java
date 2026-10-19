@@ -39,9 +39,15 @@ public final class AuthDto {
 
   public static final class Refresh {
     private final String refreshToken;
+    private Boolean extendSession;
 
     public Refresh(String refreshToken) {
       this.refreshToken = refreshToken;
+    }
+
+    public Refresh(String refreshToken, boolean extendSession) {
+      this(refreshToken);
+      if (extendSession) this.extendSession = true;
     }
 
     public String refreshToken() {
@@ -69,5 +75,6 @@ public final class AuthDto {
   public static class Tokens {
     public String accessToken, refreshToken;
     public long expiresIn;
+    public long serverTime, accessExpiresAt, sessionExpiresAt, warningSeconds, receivedAt;
   }
 }

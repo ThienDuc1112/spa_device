@@ -23,4 +23,6 @@ public interface AuthRepository {
   int consume(UUID id);
 
   int revoke(UUID familyId);
+
+  boolean activeSession(UUID familyId, long userId);
 }

@@ -38,9 +38,20 @@ flowchart TD
  deviceAndroid --> deviceApi[device-api]
 ~~~
 
-`di/AppModule` holds shared HTTP API clients, preferences, Room and Android services. Activities and fragments call those services directly, without ViewModel, UseCase or Repository layers. `ScreenTasks` handles background execution and lifecycle-safe UI callbacks; it contains no business logic. Hardware modules never depend on `app`.
+`di/AppModule` holds shared HTTP API clients, preferences, Room and Android services. Activities and fragments call those services directly, without ViewModel, UseCase or Repository layers. Login and Home inherit `BaseActivity` through `AlarmAwareActivity`. `ScreenTasks` routes results through `BaseActivity.httpReceiver()`, which dispatches to the registered `HttpReceiver<T>` callback's `onSuccess` or optional `onError`. `ScreenTasks.request` handles one HTTP request; `ScreenTasks.runAsync` handles future-based API workflows, and `ScreenTasks.run` is for local background work. Results arrive on the main thread when the screen is started and are discarded after destruction. Fragments use their host Activity for dispatch and their view lifecycle for delivery. Hardware modules never depend on `app`.
 
-`common/util/ApiCalls` uses `HttpURLConnection` and Gson for JSON requests. Endpoint clients explicitly provide the HTTP method, encoded path, body, response type and device headers. The util attaches JWTs to user requests and, on HTTP 401, serializes token refresh and retries once. A rejected refresh clears the current session; network/server errors preserve it. Auth and device-secret requests never trigger JWT refresh. Finder polling cancels its active request when the service stops.
+`common/util/ApiCalls` uses `HttpURLConnection` and Gson for JSON requests. Its public request entry point is `callApi(method, path, body, type, headers, executor)`, returning a `CompletableFuture`; there is no synchronous `execute()` API. Endpoint clients explicitly provide the HTTP method, encoded path, body, response type and device headers. The util attaches JWTs to user requests and, on HTTP 401, serializes token refresh and retries once within the background job. A rejected refresh clears the current session; network/server errors preserve it. Auth and device-secret requests never trigger JWT refresh. Finder polling cancels result delivery when the service stops; an in-flight HTTP connection continues until completion or timeout. SyncJobService and polling jobs already run on background executors and consume their futures sequentially.
+
+Endpoint clients pass request parameters directly to `ApiCalls.callApi`, which starts HTTP on the supplied executor and returns a future. `ScreenTasks.request(label, supplier, httpReceiver)` starts a fresh call after checking screen state, including on retry, and routes results through `BaseActivity`. HTTP uses a separate executor so background jobs can wait for results without blocking the HTTP pool. For example:
+
+```java
+// In ProductApi:
+return api.callApi("GET", "products/barcode/" + ApiCalls.path(barcode),
+    null, ProductDto.class, Map.of(), executor);
+
+// In a screen:
+tasks.request("Loading product...", () -> modules.productsApi.product(barcode), httpReceiver);
+```
 
 `LoginActivity` opens `HomeActivity`. Products, image viewing, inventory and disposal use fragments that call API services directly. `HomeActivity` retains Scan Order state across fragment changes. Remote finder management now lives in the React website. Home prompts unregistered PDAs to register after login; local sound settings remain on Android. Firebase and alarm services live under `infrastructure`.
 
@@ -48,7 +59,7 @@ flowchart TD
 
 Use JDK 17 or 21 and Android SDK Platform 32. Set `ANDROID_HOME` or an untracked `local.properties`. The app uses `compileSdk 32`, `targetSdk 32`, and `minSdk 26`; AGP 8.2.2 still uses Build-Tools 34.0.0.
 
-The Java/XML UI uses View Binding. Core library desugaring uses `desugar_jdk_libs 2.0.4`; Java data classes retain the former record constructors and accessors because SDK 32 lacks `java.lang.Record`. Activity 1.5.1, Lifecycle 2.5.1, Core 1.8.0, AppCompat 1.4.2, Fragment 1.5.1, Material 1.6.1, Room 2.4.3, WorkManager 2.7.1, and Firebase BOM 30.5.0 are selected for SDK 32 compatibility. Updating these families independently can pull transitive AARs that require a newer SDK. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app.
+The Java/XML UI uses View Binding. Core library desugaring uses `desugar_jdk_libs 2.0.4`; Java data classes retain the former record constructors and accessors because SDK 32 lacks `java.lang.Record`. Activity 1.5.1, Lifecycle 2.5.1, Core 1.8.0, AppCompat 1.4.2, Fragment 1.5.1, Material 1.6.1, Room 2.4.3, and Firebase BOM 30.5.0 are selected for SDK 32 compatibility. Updating these families independently can pull transitive AARs that require a newer SDK. After changing dependencies, sync Gradle and run `:app:checkDebugAarMetadata` before installing the app.
 
 ~~~sh
 ./gradlew :app:assembleDebug :app:assembleRelease
@@ -95,6 +106,6 @@ Open **Finder sound settings** on each target PDA to configure DND alarm access 
 
 ## Upgrade compatibility
 
-Application ID, `retail.db` schema/version, encrypted preferences, Keystore alias and scanner settings remain unchanged. `FcmWorkerFactory` maps old `com.company.pda.data.SyncWorker` jobs to the moved worker. The old aggregate activity, ViewModel, API, repository and model classes were replaced rather than duplicated.
+Application ID, `retail.db` schema/version, encrypted preferences, Keystore alias and scanner settings remain unchanged. `SyncJobService` replaces WorkManager with a persisted, network-constrained `JobInfo` scheduled by `JobScheduler`. On startup it cancels legacy WorkManager platform jobs and drains the existing Room ACK queue. Temporary failures use exponential backoff starting at 30 seconds; HTTP 401/403 stops retries until a new sync is scheduled. New events during a running job request a follow-up. `onStopJob` cancels the result future and retains unacknowledged events; it does not disconnect in-flight HTTP. The old aggregate activity, ViewModel, API, repository and model classes were replaced rather than duplicated.
 
 See the workspace [deployment guide](../docs/11-deployment.md) and [verification results](../docs/verification.md).

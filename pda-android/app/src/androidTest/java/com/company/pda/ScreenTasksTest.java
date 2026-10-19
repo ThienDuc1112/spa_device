@@ -4,10 +4,11 @@ import static org.junit.Assert.*;
 
 import android.os.Looper;
 import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.platform.app.InstrumentationRegistry;
+import com.company.pda.common.util.BaseActivity;
+import com.company.pda.common.util.HttpReceiver;
 import com.company.pda.common.util.ScreenTasks;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -15,11 +16,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 
 public class ScreenTasksTest {
-  private static class Owner implements LifecycleOwner {
+  private static class Owner extends BaseActivity {
     final LifecycleRegistry lifecycle = new LifecycleRegistry(this);
+    boolean received;
+
+    @Override
+    public <T> boolean httpReceiver(HttpReceiver<T> receiver, T result, Exception error) {
+      received = true;
+      return super.httpReceiver(receiver, result, error);
+    }
 
     public Lifecycle getLifecycle() {
-      return lifecycle;
+      // ComponentActivity accesses the lifecycle during its own constructor.
+      return lifecycle == null ? super.getLifecycle() : lifecycle;
     }
   }
 
@@ -38,11 +47,14 @@ public class ScreenTasksTest {
               "Test",
               () -> {
                 workerOffMain.set(Looper.myLooper() != Looper.getMainLooper());
-                return () -> {
-                  resultOnMain.set(Looper.myLooper() == Looper.getMainLooper());
-                  owner.lifecycle.setCurrentState(Lifecycle.State.DESTROYED);
-                  complete.countDown();
-                };
+                return "received";
+              },
+              result -> {
+                assertTrue(owner.received);
+                resultOnMain.set(Looper.myLooper() == Looper.getMainLooper());
+                assertEquals("received", result);
+                owner.lifecycle.setCurrentState(Lifecycle.State.DESTROYED);
+                complete.countDown();
               });
         });
     assertTrue(complete.await(5, TimeUnit.SECONDS));
@@ -68,8 +80,9 @@ public class ScreenTasksTest {
                 started.countDown();
                 if (!release.await(5, TimeUnit.SECONDS))
                   throw new IllegalStateException("Test timed out");
-                return () -> callback.set(true);
-              });
+                return "received";
+              },
+              result -> callback.set(true));
         });
     assertTrue(started.await(5, TimeUnit.SECONDS));
     instrumentation.runOnMainSync(
@@ -84,5 +97,44 @@ public class ScreenTasksTest {
     assertEquals(0, executor.getActiveCount());
     instrumentation.waitForIdleSync();
     assertFalse(callback.get());
+  }
+
+  @Test
+  public void errorReceiverRunsOnMainAndCanHandleError() throws Exception {
+    var complete = new CountDownLatch(1);
+    var onMain = new AtomicBoolean();
+    var expected = new java.io.IOException("offline");
+    InstrumentationRegistry.getInstrumentation()
+        .runOnMainSync(
+            () -> {
+              var owner = new Owner();
+              owner.lifecycle.setCurrentState(Lifecycle.State.STARTED);
+              var tasks = new ScreenTasks(ApplicationProvider.getApplicationContext(), owner);
+              HttpReceiver<String> httpReceiver =
+                  new HttpReceiver<>() {
+                    public void onSuccess(String result) {
+                      fail("Expected failure");
+                    }
+
+                    public boolean onError(Exception error) {
+                      assertTrue(owner.received);
+                      onMain.set(Looper.myLooper() == Looper.getMainLooper());
+                      assertSame(expected, error);
+                      assertFalse(tasks.busy.getValue());
+                      assertNull(tasks.error.getValue());
+                      owner.lifecycle.setCurrentState(Lifecycle.State.DESTROYED);
+                      complete.countDown();
+                      return true;
+                    }
+                  };
+              tasks.run(
+                  "Failure",
+                  () -> {
+                    throw expected;
+                  },
+                  httpReceiver);
+            });
+    assertTrue(complete.await(5, TimeUnit.SECONDS));
+    assertTrue(onMain.get());
   }
 }

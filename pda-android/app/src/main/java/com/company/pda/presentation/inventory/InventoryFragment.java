@@ -1,7 +1,5 @@
 package com.company.pda.presentation.inventory;
 
-import static com.company.pda.common.util.ApiCalls.execute;
-
 import android.os.Bundle;
 import android.view.*;
 import androidx.annotation.NonNull;
@@ -49,16 +47,13 @@ public class InventoryFragment extends Fragment {
       render();
       return;
     }
-    tasks.run(
-        "Loading inventory...",
-        () -> {
-          var result = execute(modules.inventoryApi.inventory(code));
-          return () -> {
-            tasks.clearRetry();
-            row = result;
-            render();
-          };
-        });
+    HttpReceiver<InventoryDto> httpReceiver =
+        result -> {
+          tasks.clearRetry();
+          row = result;
+          render();
+        };
+    tasks.request("Loading inventory...", () -> modules.inventoryApi.inventory(code), httpReceiver);
   }
 
   private void adjust(String quantity, String reason) {
@@ -77,16 +72,13 @@ public class InventoryFragment extends Fragment {
             count,
             row.version,
             reason);
-    tasks.run(
-        "Saving inventory...",
-        () -> {
-          var updated = execute(modules.inventoryApi.adjust(body));
-          return () -> {
-            tasks.clearRetry();
-            home.tasks.status.setValue("Inventory saved - " + updated.quantity);
-            home.navigate("product");
-          };
-        });
+    HttpReceiver<InventoryDto> httpReceiver =
+        updated -> {
+          tasks.clearRetry();
+          home.tasks.status.setValue("Inventory saved - " + updated.quantity);
+          home.navigate("product");
+        };
+    tasks.request("Saving inventory...", () -> modules.inventoryApi.adjust(body), httpReceiver);
   }
 
   private void render() {
@@ -96,7 +88,7 @@ public class InventoryFragment extends Fragment {
       return;
     }
     ui.text(getArguments().getString("productCode"), 22);
-    ui.text("Current quantity: " + row.quantity + " • version " + row.version, 16);
+    ui.text("Current quantity: " + row.quantity + " â€¢ version " + row.version, 16);
     var qty = ui.input("New quantity", row.quantity.toPlainString(), 8194);
     var reason = ui.input("Reason", "", 1);
     ui.button(

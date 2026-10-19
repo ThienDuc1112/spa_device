@@ -35,7 +35,7 @@ sequenceDiagram
     B->>F: Gửi data message đến token
     F-->>A: FIND / STOP
     A->>A: Xử lý lệnh, phát hoặc dừng chuông
-    A->>B: POST /pda/events qua SyncWorker
+    A->>B: POST /pda/events qua SyncJobService
 ```
 
 Sơ đồ minh họa trường hợp token có trước đăng ký. Nếu đăng ký trước khi lấy được token, Android gửi `fcmToken = null`, rồi cập nhật token sau bằng `PUT /devices/token`.
@@ -84,7 +84,7 @@ if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
       .addOnSuccessListener(this::refreshed)
       .addOnFailureListener(error -> failed("TOKEN_ERROR"));
 }
-SyncWorker.schedule(context);
+SyncJobService.schedule(context);
 ```
 
 - Chưa có FirebaseApp: ghi lỗi `NOT_CONFIGURED`.
@@ -99,7 +99,7 @@ public void refreshed(String token) {
   tokens.put("fcmToken", token);
   if (!"DELIVERY_ERROR".equals(tokens.get("fcmFailure")))
     tokens.put("fcmFailure", null);
-  SyncWorker.schedule(context);
+  SyncJobService.schedule(context);
 }
 ```
 
@@ -149,17 +149,17 @@ Nếu chưa có token, giá trị là JSON `null` hoặc trường bị bỏ qua
 
 Sau đăng ký thành công, [HomeActivity.register()](../pda-android/app/src/main/java/com/company/pda/presentation/home/HomeActivity.java) gọi lại `modules.fcm.initialize()` và chỉ khởi động polling nếu APK được cấu hình `finderTransport=polling`.
 
-### Đường B: Đồng bộ token bằng SyncWorker
+### Đường B: Đồng bộ token bằng SyncJobService
 
-[SyncWorker](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncWorker.java) đọc ba giá trị:
+[SyncJobService](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncJobService.java) đọc ba giá trị:
 
 ```java
 String id = m.tokens.get("deviceId"),
     secret = m.tokens.get("deviceSecret"),
     token = m.tokens.get("fcmToken");
-if (id == null || secret == null) return Result.success();
+if (id == null || secret == null) return false;
 if (token != null)
-  execute(m.finderApi.token(
+  run.await(m.finderApi.token(
       Long.parseLong(id), secret, new PdaFinderDto.Token(token)));
 ```
 
@@ -174,9 +174,9 @@ Content-Type: application/json
 {"fcmToken": "<fcm-token-moi-nhat>"}
 ```
 
-Worker chỉ chạy khi có mạng theo constraint của WorkManager. Nếu chưa có thông tin đăng ký thiết bị, worker kết thúc thành công và không gửi token; lần đăng ký thành công sẽ lên lịch lại qua `initialize()`.
+Job chỉ chạy khi có mạng theo `JobInfo.NETWORK_TYPE_ANY`. `onStartJob()` chuyển công việc sang executor; khi hoàn tất gọi `jobFinished()`. Nếu chưa có thông tin đăng ký thiết bị, job kết thúc và không gửi token; lần đăng ký thành công sẽ lên lịch lại qua `initialize()`.
 
-Lỗi API 401/403 khiến worker thất bại, các lỗi API khác hoặc exception dẫn đến retry với exponential backoff bắt đầu từ 30 giây. Đây là chính sách thử lại, không bảo đảm đúng 30 giây sẽ có lần chạy tiếp theo. Worker còn gửi các sự kiện đang chờ nên có thể gửi lại cùng token ở những lần đồng bộ sau.
+Lỗi API 401/403 dừng retry; các lỗi API khác hoặc exception dẫn đến retry với exponential backoff bắt đầu từ 30 giây. Đây là chính sách thử lại, không bảo đảm đúng 30 giây sẽ có lần chạy tiếp theo. Job còn gửi các sự kiện đang chờ nên có thể gửi lại cùng token ở những lần đồng bộ sau. Job được lưu qua reboot bằng `setPersisted(true)` và quyền `RECEIVE_BOOT_COMPLETED`. Khi Android gọi `onStopJob()`, request HTTP hiện tại bị hủy và các sự kiện chưa ACK vẫn nằm trong Room.
 
 ## 6. Backend nhận, xác thực và lưu token
 
@@ -259,7 +259,7 @@ Gửi thành công: processor ghi `PUSH_FIND` hoặc `PUSH_STOP`; với FIND cò
 - STOP gọi use case dừng chuông.
 - Push HIGH có ID/loại lệnh hợp lệ xóa cờ lỗi FCM local.
 
-[PdaAlarmService](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/PdaAlarmService.java) ghi sự kiện như `RINGING`, `STOPPED`, `FAILED` qua `SyncWorker.event()`. Worker gửi các sự kiện này tới `POST /pda/events` với credential thiết bị. Backend kiểm tra request thuộc đúng PDA trước khi cập nhật trạng thái.
+[PdaAlarmService](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/PdaAlarmService.java) ghi sự kiện như `RINGING`, `STOPPED`, `FAILED` qua `SyncJobService.event()`. Worker gửi các sự kiện này tới `POST /pda/events` với credential thiết bị. Backend kiểm tra request thuộc đúng PDA trước khi cập nhật trạng thái.
 
 Phải phân biệt: token đã lưu, gửi push thành công và PDA đã phát chuông là ba mốc khác nhau. `SENT` không phải xác nhận `RINGING`.
 

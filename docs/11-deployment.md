@@ -1,5 +1,7 @@
 # 11. Deployment guide
 
+> Database update: schema SQL in both `db/migration` and `db/legacy` now targets Oracle 19c. Earlier PostgreSQL migration/legacy-preservation notes below describe the previous version. Runtime integration remains PostgreSQL; see [current schema instructions](../pda-management/src/main/resources/db/README.md).
+
 ## Build and verify
 
 Prerequisites: JDK 8 and Maven 3.9+ for the backend; JDK 21 for Android, Android SDK 35 and an installed/licensed SDK toolchain. The Gradle 8.11.1 wrapper is included. Backend integration tests start an isolated real PostgreSQL 14 instance using [Zonky Embedded Postgres](https://github.com/zonkyio/embedded-postgres), including on Windows; no Docker daemon is required for the test suite. Run tests as a non-root user on Linux. The application deployment uses PostgreSQL 16.

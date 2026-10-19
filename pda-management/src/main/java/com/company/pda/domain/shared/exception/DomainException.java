@@ -2,10 +2,16 @@ package com.company.pda.domain.shared.exception;
 
 public class DomainException extends RuntimeException {
   public final int status;
+  public final String code;
 
   public DomainException(int status, String message) {
+    this(status, null, message);
+  }
+
+  public DomainException(int status, String code, String message) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 
   public static <T> T found(T value) {

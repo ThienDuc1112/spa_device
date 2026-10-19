@@ -89,12 +89,11 @@ pda-android/
 │   │   │   │               │   │   └── DeviceManager.java
 │   │   │   │               │   └── firebase
 │   │   │   │               │       ├── FcmTokenManager.java
-│   │   │   │               │       ├── FcmWorkerFactory.java
 │   │   │   │               │       ├── FinderCommandHandler.java
 │   │   │   │               │       ├── FinderPollingCycle.java
 │   │   │   │               │       ├── FinderPollingService.java
 │   │   │   │               │       ├── PdaFirebaseMessagingService.java
-│   │   │   │               │       └── SyncWorker.java
+│   │   │   │               │       └── SyncJobService.java
 │   │   │   │               ├── presentation
 │   │   │   │               │   ├── auth
 │   │   │   │               │   │   └── LoginActivity.java

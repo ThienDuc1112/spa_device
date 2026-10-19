@@ -15,7 +15,7 @@ sequenceDiagram
     participant FCM as Firebase Cloud Messaging
     participant Receiver as PdaFirebaseMessagingService
     participant Alarm as PdaAlarmService / DeviceAlarmAdapter
-    participant Sync as SyncWorker
+    participant Sync as SyncJobService
     Manager->>API: POST /web/finder/devices/{deviceId}/find (không JWT)
     API->>DB: Transaction: tạo QUEUED, ghi log và outbox FIND
     API-->>Manager: id, status, expiresAt
@@ -147,7 +147,7 @@ public void refreshed(String token) {
   // Token mới chưa chứng minh việc nhận message đã phục hồi.
   if (!"DELIVERY_ERROR".equals(tokens.get("fcmFailure")))
     tokens.put("fcmFailure", null);
-  SyncWorker.schedule(context);
+  SyncJobService.schedule(context);
 }
 ```
 
@@ -167,7 +167,7 @@ tasks.run("Registering device…", () -> {
 });
 ```
 
-API tương ứng là `POST /devices/register`. Có thể đăng ký khi chưa có token; khi SDK lấy/đổi token, `onNewToken()` gọi `fcm.refreshed(token)` và [SyncWorker.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncWorker.java) đồng bộ qua:
+API tương ứng là `POST /devices/register`. Có thể đăng ký khi chưa có token; khi SDK lấy/đổi token, `onNewToken()` gọi `fcm.refreshed(token)` và [SyncJobService.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncJobService.java) đồng bộ qua:
 
 ```http
 PUT /devices/token
@@ -372,7 +372,7 @@ var policy = new com.company.device.api.AlarmPolicy(
     "android.resource://" + getPackageName() + "/raw/pda_alarm", deadline, true);
 var result = adapter.start(policy, () -> failAlarm("Alarm interrupted: audio focus lost"));
 if (result.ringing()) {
-  SyncWorker.event(app, requestId, "RINGING");
+  SyncJobService.event(app, requestId, "RINGING");
   sendBroadcast(new Intent(SHOW).setPackage(getPackageName()));
   timeout.schedule(policy, this::stopSelf);
   audioMonitor.postDelayed(this::checkAudio, 500);
@@ -453,7 +453,7 @@ Thiết lập trên PDA: **Finder sound settings → Grant Do Not Disturb access
 
 ## 9. PDA báo kết quả về backend
 
-`SyncWorker.event()` lưu sự kiện vào Room rồi lên lịch WorkManager với điều kiện có mạng. Vì vậy trạng thái trên backend có thể cập nhật trễ hơn tiếng chuông thực tế.
+`SyncJobService.event()` lưu sự kiện vào Room rồi lên lịch JobScheduler với điều kiện có mạng. Vì vậy trạng thái trên backend có thể cập nhật trễ hơn tiếng chuông thực tế.
 
 ```java
 var event = new PendingEvent();
@@ -463,11 +463,11 @@ app.modules().database.events().event(event);
 schedule(app);
 ```
 
-Trong `SyncWorker.doWork()`, các sự kiện được gửi bằng device credential:
+Trong `SyncJobService.synchronize()`, các sự kiện được gửi bằng device credential:
 
 ```java
-execute(m.finderApi.event(
-    Long.parseLong(id), secret, new PdaFinderDto.Event(e.requestId, e.status)));
+run.await(m.finderApi.event(
+    Long.parseLong(id), secret, new PdaFinderDto.Event(event.requestId, event.status)));
 ```
 
 Ví dụ HTTP:
@@ -588,13 +588,13 @@ React đọc `/web/finder/configuration` để hiện cảnh báo FCM/scheduler 
 | Hiện tượng                            | Điểm cần kiểm tra                                                                                            |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Request có nhưng chưa có `PUSH_FIND`  | Scheduler dev có bật không; token; outbox; Firebase Admin credential                                         |
-| `NO_TOKEN`                            | Token SDK đã có và `SyncWorker` đã cập nhật backend chưa                                                     |
+| `NO_TOKEN`                            | Token SDK đã có và `SyncJobService` đã cập nhật backend chưa                                                     |
 | `INVALID_TOKEN`                       | Token của bản cài app cũ; kiểm tra đồng bộ token mới                                                         |
 | `RETRY`                               | Kết nối Firebase, quyền/project credential, lỗi gửi; xem attempts và thời hạn                                |
 | `PUSH_FIND` nhưng receiver không chạy | Kết nối PDA, đúng Firebase project/token, trạng thái force-stop, giới hạn giao message                       |
 | Receiver chạy nhưng không phát        | ID trùng/đã handled, thời hạn cũ, priority bị hạ, start service bị chặn                                      |
 | Service báo `FAILED`                  | DND access/Allow alarms, audio focus, volume, chọn loa; xem `Last finder audio failure` trong sound settings |
-| Có tiếng nhưng backend chưa `RINGING` | Room/WorkManager, mạng, device credential và API `/pda/events`                                               |
+| Có tiếng nhưng backend chưa `RINGING` | Room/JobScheduler, mạng, device credential và API `/pda/events`                                               |
 | Find trả 409                          | PDA đang có request còn hiệu lực; dừng hoặc chờ hết hạn                                                      |
 
 Tài liệu mô tả code đang có; không khẳng định đã thử giao FCM thật hoặc âm thanh trên mọi model PDA. Các bài test build/backend không thay thế kiểm thử trên thiết bị, đặc biệt với DND, Doze và chính sách OEM.

@@ -61,6 +61,7 @@ class StoreFlowsIT {
   @Autowired JdbcTemplate db;
   @Autowired ObjectMapper json;
   @Autowired PasswordEncoder passwords;
+  @Autowired com.company.pda.application.port.out.TokenProvider tokenProvider;
   @Autowired OutboxProcessor worker;
   @Autowired com.company.pda.domain.pdafinder.repository.PdaFindRepository finderRequests;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
@@ -176,6 +177,98 @@ class StoreFlowsIT {
         .andExpect(status().isUnauthorized());
     postJson("/auth/refresh", "", mapOf("refreshToken", rotated.get("refreshToken").asText()))
         .andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/products/barcode/123")
+                .header("Authorization", "Bearer " + rotated.get("accessToken").asText()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("SESSION_REVOKED"));
+  }
+
+  @Test
+  void androidSessionHasFixedDeadlineAndExplicitExtension() throws Exception {
+    JsonNode initial =
+        body(
+            mvc.perform(
+                    post("/auth/login")
+                        .header("PDA_TYPE", "ANDROID")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            json.writeValueAsString(
+                                mapOf("username", "user1", "password", "test-password"))))
+                .andExpect(status().isOk())
+                .andReturn());
+    long deadline = initial.get("sessionExpiresAt").asLong();
+    assertEquals(900, initial.get("expiresIn").asLong());
+    assertEquals(300, initial.get("warningSeconds").asLong());
+    assertTrue(Math.abs(deadline - initial.get("serverTime").asLong() - 7200000) < 1000);
+    JsonNode rotated =
+        body(
+            mvc.perform(
+                    post("/auth/refresh")
+                        .header("PDA_TYPE", "ANDROID")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            json.writeValueAsString(
+                                mapOf("refreshToken", initial.get("refreshToken").asText()))))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertEquals(deadline, rotated.get("sessionExpiresAt").asLong());
+    JsonNode extended =
+        body(
+            mvc.perform(
+                    post("/auth/refresh")
+                        .header("PDA_TYPE", "ANDROID")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            json.writeValueAsString(
+                                mapOf(
+                                    "refreshToken",
+                                    rotated.get("refreshToken").asText(),
+                                    "extendSession",
+                                    true))))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertTrue(extended.get("sessionExpiresAt").asLong() >= deadline);
+    assertTrue(
+        Math.abs(
+                extended.get("sessionExpiresAt").asLong()
+                    - extended.get("serverTime").asLong()
+                    - 7200000)
+            < 1000);
+    assertEquals(3, login("user1").size()); // Existing login response contract without opt-in.
+  }
+
+  @Test
+  void forgedAccessTokenHasDistinctErrorCode() throws Exception {
+    mvc.perform(get("/products/barcode/123").header("Authorization", "Bearer forged.token.value"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_INVALID"));
+  }
+
+  @Test
+  void signedExpiredTokensHaveDistinctCodes() throws Exception {
+    java.time.Instant now = java.time.Instant.now();
+    com.company.pda.domain.auth.model.User user =
+        new com.company.pda.domain.auth.model.User(1, "user1", "unused", 1, true);
+    String expiredAccess =
+        tokenProvider.access(
+            user,
+            java.util.Arrays.asList("MANAGER"),
+            now.minusSeconds(1000),
+            now.minusSeconds(100),
+            UUID.randomUUID());
+    mvc.perform(get("/products/barcode/123").header("Authorization", "Bearer " + expiredAccess))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_EXPIRED"));
+    String expiredRefresh =
+        tokenProvider.refresh(
+            user, UUID.randomUUID(), now.minusSeconds(8000), now.minusSeconds(100));
+    postJson("/auth/refresh", "", mapOf("refreshToken", expiredRefresh))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+    postJson("/auth/refresh", "", mapOf("refreshToken", "forged.token.value"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
   }
 
   @Test

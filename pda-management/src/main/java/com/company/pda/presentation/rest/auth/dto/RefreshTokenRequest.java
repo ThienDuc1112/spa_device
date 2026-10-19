@@ -8,6 +8,11 @@ import javax.validation.constraints.*;
 @lombok.ToString
 public final class RefreshTokenRequest {
   private final @NotBlank @Size(max = 4096) String refreshToken;
+  private boolean extendSession;
+
+  public void setExtendSession(boolean extendSession) {
+    this.extendSession = extendSession;
+  }
 
   @java.beans.ConstructorProperties({"refreshToken"})
   public RefreshTokenRequest(String refreshToken) {
@@ -23,6 +28,6 @@ public final class RefreshTokenRequest {
   }
 
   public RefreshTokenCommand toCommand() {
-    return new RefreshTokenCommand(refreshToken);
+    return new RefreshTokenCommand(refreshToken, extendSession);
   }
 }

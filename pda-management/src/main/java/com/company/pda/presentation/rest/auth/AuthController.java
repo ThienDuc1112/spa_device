@@ -31,12 +31,16 @@ public class AuthController {
   }
 
   @PostMapping("/login")
-  public LoginResponse login(@Valid @RequestBody LoginRequest body) {
-    return LoginResponse.from(auth.login(body.toCommand()));
+  public LoginResponse login(
+      @Valid @RequestBody LoginRequest body,
+      @RequestHeader(value = "PDA_TYPE", required = false) String pdaType) {
+    return LoginResponse.from(auth.login(body.toCommand()), "ANDROID".equalsIgnoreCase(pdaType));
   }
 
   @PostMapping("/refresh")
-  public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest body) {
-    return LoginResponse.from(auth.refresh(body.toCommand()));
+  public LoginResponse refresh(
+      @Valid @RequestBody RefreshTokenRequest body,
+      @RequestHeader(value = "PDA_TYPE", required = false) String pdaType) {
+    return LoginResponse.from(auth.refresh(body.toCommand()), "ANDROID".equalsIgnoreCase(pdaType));
   }
 }

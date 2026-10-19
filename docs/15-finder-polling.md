@@ -30,7 +30,7 @@ Backend `FCM_ENABLED` chỉ điều khiển gửi push. Có thể đặt false k
 4. Backend chỉ trả request đúng thiết bị/cửa hàng, chưa hết hạn. QUEUED/SENT/RINGING trả FIND; trạng thái kết thúc trả STOP. GET không xóa lệnh, response không cache.
 5. `FinderCommandHandler` kiểm tra UUID, deadline, phiên đang reo và lệnh đã xử lý. STOP ghi tombstone để FIND trễ không khởi động lại. Lệnh hợp lệ dùng cùng `PdaAlarmService` như FCM.
 6. APK polling bỏ qua FIND/STOP đến qua FCM ngay trong receiver. Lỗi hoặc phục hồi FCM không đổi chế độ. Token Firebase vẫn có thể được SDK đồng bộ; backend vẫn có thể gửi push nếu đang bật.
-7. RINGING/STOPPED/FAILED vẫn được gửi qua Room và `SyncWorker` bằng HTTP trong cả hai chế độ.
+7. RINGING/STOPPED/FAILED vẫn được gửi qua Room và `SyncJobService` bằng HTTP trong cả hai chế độ.
 
 ```http
 GET /pda/commands

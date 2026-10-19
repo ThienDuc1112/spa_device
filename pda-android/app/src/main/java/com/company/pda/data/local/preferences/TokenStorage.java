@@ -106,7 +106,7 @@ public final class TokenStorage implements com.company.pda.common.util.ApiCalls.
   }
 
   public synchronized void tokens(com.company.pda.data.remote.dto.auth.AuthDto.Tokens t) {
-
+    t.receivedAt = System.currentTimeMillis();
     put("session", new com.google.gson.Gson().toJson(t));
   }
 

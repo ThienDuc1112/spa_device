@@ -7,7 +7,7 @@ import android.os.*;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.company.pda.PdaApplication;
-import com.company.pda.infrastructure.firebase.SyncWorker;
+import com.company.pda.infrastructure.firebase.SyncJobService;
 import com.company.pda.presentation.home.HomeActivity;
 
 public class PdaAlarmService extends Service {
@@ -197,7 +197,7 @@ public class PdaAlarmService extends Service {
             + result.message());
     if (result.ringing()) {
       startVibration();
-      SyncWorker.event(app, requestId, "RINGING");
+      SyncJobService.event(app, requestId, "RINGING");
       sendBroadcast(new Intent(SHOW).setPackage(getPackageName()));
       Log.i(TAG, "schedule timeout requestId=" + requestId + " deadlineMs=" + deadline);
       timeout.schedule(
@@ -277,7 +277,7 @@ public class PdaAlarmService extends Service {
     if (requestId == null || failed) return;
     Log.e(TAG, "alarm failed requestId=" + requestId + " reason=" + reason);
     failed = true;
-    SyncWorker.event((PdaApplication) getApplication(), requestId, "FAILED");
+    SyncJobService.event((PdaApplication) getApplication(), requestId, "FAILED");
     getSharedPreferences("finder_sound", MODE_PRIVATE)
         .edit()
         .putString("last_failure", reason == null ? "Alarm audio unavailable" : reason)
@@ -302,7 +302,7 @@ public class PdaAlarmService extends Service {
 
       app.modules().tokens.put("handled:" + requestId, "true");
 
-      if (!failed) SyncWorker.event(app, requestId, "STOPPED");
+      if (!failed) SyncJobService.event(app, requestId, "STOPPED");
 
       requestId = null;
     }

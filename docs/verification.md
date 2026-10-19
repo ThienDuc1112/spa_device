@@ -1,5 +1,7 @@
 # Verification results
 
+> Database update: schema SQL in both `db/migration` and `db/legacy` now targets Oracle 19c. Earlier PostgreSQL migration/legacy-preservation notes below describe the previous version. Runtime integration remains PostgreSQL; see [current schema instructions](../pda-management/src/main/resources/db/README.md).
+
 ## Android direct service calls — 2026-10-03
 
 - Activities/fragments now call Retrofit API clients directly. Removed Android business ViewModels, UseCases and Repository interfaces/implementations; Firebase/polling call AlarmController directly. Home state uses Bundle; UI callbacks wait until the screen is started and are dropped after destruction.

@@ -31,7 +31,9 @@ pda-android/
 │   │   │   │               │       ├── AlarmAwareActivity.java
 │   │   │   │               │       ├── ApiCalls.java
 │   │   │   │               │       ├── BarcodeInput.java
+│   │   │   │               │       ├── BaseActivity.java
 │   │   │   │               │       ├── ScreenSupport.java
+│   │   │   │               │       ├── HttpReceiver.java
 │   │   │   │               │       ├── ScreenTasks.java
 │   │   │   │               │       └── ScreenViews.java
 │   │   │   │               ├── data
@@ -91,12 +93,11 @@ pda-android/
 │   │   │   │               │   │   └── DeviceManager.java
 │   │   │   │               │   └── firebase
 │   │   │   │               │       ├── FcmTokenManager.java
-│   │   │   │               │       ├── FcmWorkerFactory.java
 │   │   │   │               │       ├── FinderCommandHandler.java
 │   │   │   │               │       ├── FinderPollingCycle.java
 │   │   │   │               │       ├── FinderPollingService.java
 │   │   │   │               │       ├── PdaFirebaseMessagingService.java
-│   │   │   │               │       └── SyncWorker.java
+│   │   │   │               │       └── SyncJobService.java
 │   │   │   │               ├── presentation
 │   │   │   │               │   ├── auth
 │   │   │   │               │   │   └── LoginActivity.java

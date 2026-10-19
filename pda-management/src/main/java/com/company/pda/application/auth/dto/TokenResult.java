@@ -6,6 +6,7 @@ public final class TokenResult {
   private final String accessToken;
   private final String refreshToken;
   private final long expiresIn;
+  public long serverTime, accessExpiresAt, sessionExpiresAt, warningSeconds;
 
   @java.beans.ConstructorProperties({"accessToken", "refreshToken", "expiresIn"})
   public TokenResult(String accessToken, String refreshToken, long expiresIn) {

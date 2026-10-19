@@ -1,7 +1,5 @@
 package com.company.pda.presentation.auth;
 
-import static com.company.pda.common.util.ApiCalls.execute;
-
 import android.content.Intent;
 import android.os.Bundle;
 import com.company.pda.PdaApplication;
@@ -26,6 +24,8 @@ public class LoginActivity extends AlarmAwareActivity {
     ScreenSupport.insets(binding.getRoot());
     var ui = new ScreenViews(binding.content);
     ui.text("Sign in to your store", 18);
+    String sessionMessage = getIntent().getStringExtra("sessionMessage");
+    if (sessionMessage != null) ui.text(sessionMessage, 16);
     var user = ui.input("Username", "", 1);
     user.setId(R.id.login_username);
     var password = ui.input("Password", "", 129);
@@ -47,15 +47,23 @@ public class LoginActivity extends AlarmAwareActivity {
       tasks.error.setValue("Enter username and password");
       return;
     }
-    tasks.run(
+    HttpReceiver<AuthDto.Tokens> httpReceiver =
+        tokens -> {
+          tasks.clearRetry();
+          openHome();
+        };
+    tasks.runAsync(
         "Signing in...",
-        () -> {
-          modules.tokens.tokens(
-              execute(modules.authApi.login(new AuthDto.Login(username, password))));
-          return () -> {
-            tasks.clearRetry();
-            openHome();
-          };
-        });
+        () ->
+            modules
+                .authApi
+                .login(new AuthDto.Login(username, password))
+                .thenApplyAsync(
+                    tokens -> {
+                      modules.tokens.tokens(tokens);
+                      return tokens;
+                    },
+                    modules.io),
+        httpReceiver);
   }
 }

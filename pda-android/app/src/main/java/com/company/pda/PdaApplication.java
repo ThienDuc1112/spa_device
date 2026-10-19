@@ -3,13 +3,7 @@ package com.company.pda;
 import android.app.Application;
 import com.company.pda.di.AppModule;
 
-public class PdaApplication extends Application implements androidx.work.Configuration.Provider {
-  public androidx.work.Configuration getWorkManagerConfiguration() {
-    return new androidx.work.Configuration.Builder()
-        .setWorkerFactory(new com.company.pda.infrastructure.firebase.FcmWorkerFactory())
-        .build();
-  }
-
+public class PdaApplication extends Application {
   private AppModule modules;
 
   public AppModule modules() {

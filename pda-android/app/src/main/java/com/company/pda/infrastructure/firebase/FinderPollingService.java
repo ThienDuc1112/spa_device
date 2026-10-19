@@ -11,7 +11,6 @@ import com.company.pda.PdaApplication;
 import com.company.pda.common.exception.ApiException;
 import com.company.pda.presentation.home.HomeActivity;
 import java.util.concurrent.*;
-import com.company.pda.common.util.ApiCalls;
 
 /** Persistent finder transport for managed PDAs; requires fleet battery-policy configuration. */
 public final class FinderPollingService extends Service {
@@ -22,7 +21,7 @@ public final class FinderPollingService extends Service {
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
   private final Handler main = new Handler(Looper.getMainLooper());
   private volatile boolean destroyed;
-  private volatile ApiCalls.Request<?> activeCall;
+  private volatile java.util.concurrent.CompletableFuture<?> activeCall;
   private PowerManager.WakeLock wakeLock;
   private boolean started;
   private long delaySeconds = 5;
@@ -130,7 +129,7 @@ public final class FinderPollingService extends Service {
         cycleSecret = secret;
         cycle =
             new FinderPollingCycle(
-                () -> execute(app.modules().finderApi.commands(Long.parseLong(id), secret)),
+                () -> execute(() -> app.modules().finderApi.commands(Long.parseLong(id), secret)),
                 "polling".equals(BuildConfig.FINDER_TRANSPORT));
       }
       var commands = cycle.run();
@@ -201,20 +200,23 @@ public final class FinderPollingService extends Service {
     }
   }
 
-  private <T> T execute(ApiCalls.Request<T> call) throws java.io.IOException {
+  private <T> T execute(java.util.function.Supplier<java.util.concurrent.CompletableFuture<T>> work)
+      throws java.io.IOException {
+    java.util.concurrent.CompletableFuture<T> call;
     synchronized (this) {
       if (destroyed) throw new java.io.IOException("Finder monitor stopped");
+      call = work.get();
       activeCall = call;
     }
-    Log.d(
-        TAG,
-        "HTTP send GET /pda/commands host="
-            + call.url().getHost()
-            + " port="
-            + call.url().getPort()
-            + " scheme="
-            + call.url().getProtocol());
-    T body = com.company.pda.common.util.ApiCalls.execute(call);
+    Log.d(TAG, "HTTP send GET /pda/commands");
+    T body;
+    try {
+      // poll() already runs on the service executor, which also owns cancellation.
+      body = call.join();
+    } catch (java.util.concurrent.CompletionException failure) {
+      if (failure.getCause() instanceof java.io.IOException error) throw error;
+      throw failure;
+    }
     Log.d(TAG, "HTTP success GET /pda/commands bodyPresent=" + (body != null));
     return body;
   }
@@ -229,7 +231,7 @@ public final class FinderPollingService extends Service {
             + (wakeLock != null && wakeLock.isHeld()));
     destroyed = true;
     var call = activeCall;
-    if (call != null) call.cancel();
+    if (call != null) call.cancel(true);
     executor.shutdownNow();
     main.removeCallbacksAndMessages(null);
     if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();

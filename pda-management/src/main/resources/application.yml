@@ -28,6 +28,10 @@ management:
 app:
   jwt-secret: "rebZ2O/rhVdDbHI1E3pSFnnLodA+O8aeg4UKVUmX0q8="
   issuer: retail-pda
+  auth:
+    access-seconds: ${ACCESS_TOKEN_SECONDS:900}
+    session-seconds: ${SESSION_SECONDS:7200}
+    warning-seconds: ${SESSION_WARNING_SECONDS:300}
   fcm-enabled: ${FCM_ENABLED:true}
   finder-timeout-seconds: ${FINDER_TIMEOUT_SECONDS:900}
   bootstrap:

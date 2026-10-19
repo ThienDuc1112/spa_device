@@ -1,7 +1,5 @@
 package com.company.pda.presentation.home;
 
-import static com.company.pda.common.util.ApiCalls.execute;
-
 import android.content.*;
 import android.os.*;
 import android.widget.*;
@@ -23,6 +21,16 @@ import com.google.gson.Gson;
 import java.util.*;
 
 public class HomeActivity extends AlarmAwareActivity {
+  @Override
+  protected boolean requiresSession() {
+    return true;
+  }
+
+  @Override
+  protected void onSessionTimeChanged(String text) {
+    if (binding != null) binding.sessionTime.setText(text);
+  }
+
   private AppModule modules;
   public ScreenTasks tasks;
   public final ArrayList<Product> scanned = new ArrayList<>();
@@ -60,6 +68,7 @@ public class HomeActivity extends AlarmAwareActivity {
     ScreenSupport.insets(binding.getRoot());
     ScreenSupport.observe(this, this, tasks);
     var ui = new ScreenViews(binding.content);
+    ui.button("Extend session", this::renewSession);
     ui.button("Scan Order", () -> navigate("product"));
     ui.button("Disposal inquiry", () -> navigate("disposal"));
     ui.button("Register this PDA", this::register);
@@ -235,38 +244,38 @@ public class HomeActivity extends AlarmAwareActivity {
       return;
     }
     String id = modules.tokens.get("deviceId"), secret = modules.tokens.get("deviceSecret");
-    tasks.run(
-        "Checking PDA registration…",
-        () -> {
-          try {
-            // Device-authenticated, one check when Home resumes, not command/health polling.
-            com.company.pda.common.util.ApiCalls.execute(
-                modules.finderApi.fcmHealth(Long.parseLong(id), secret));
-            return () -> {
-              tasks.clearRetry();
-              tasks.status.setValue("PDA registered");
-            };
-          } catch (com.company.pda.common.exception.ApiException e) {
-            if (e.status != 401) throw e;
-            return () -> {
-              tasks.clearRetry();
-              if (modules.device.clearRegistration(id, secret)) {
-                getApplication()
-                    .stopService(
-                        new android.content.Intent(
-                            getApplication(),
-                            com.company.pda.infrastructure.firebase.FinderPollingService.class));
-                getApplication()
-                    .stopService(
-                        new android.content.Intent(
-                            getApplication(),
-                            com.company.pda.infrastructure.alarm.PdaAlarmService.class));
-                tasks.status.setValue("PDA registration was removed. Register this device again.");
-                register();
-              }
-            };
+    HttpReceiver<PdaFinderDto.FcmHealth> httpReceiver =
+        new HttpReceiver<>() {
+          public void onSuccess(PdaFinderDto.FcmHealth result) {
+            tasks.clearRetry();
+            tasks.status.setValue("PDA registered");
           }
-        });
+
+          public boolean onError(Exception error) {
+            if (!(error instanceof com.company.pda.common.exception.ApiException apiError)
+                || apiError.status != 401) return false;
+            tasks.clearRetry();
+            if (modules.device.clearRegistration(id, secret)) {
+              getApplication()
+                  .stopService(
+                      new Intent(
+                          getApplication(),
+                          com.company.pda.infrastructure.firebase.FinderPollingService.class));
+              getApplication()
+                  .stopService(
+                      new Intent(
+                          getApplication(),
+                          com.company.pda.infrastructure.alarm.PdaAlarmService.class));
+              tasks.status.setValue("PDA registration was removed. Register this device again.");
+              register();
+            }
+            return true;
+          }
+        };
+    tasks.request(
+        "Checking PDA registration?",
+        () -> modules.finderApi.fcmHealth(Long.parseLong(id), secret),
+        httpReceiver);
   }
 
   public void register(String code, String name) {
@@ -279,22 +288,28 @@ public class HomeActivity extends AlarmAwareActivity {
           "Enter an asset code (up to 100 characters) and name (up to 255 characters)");
       return;
     }
-    tasks.run(
-        "Registering device…",
-        () -> {
-          var registration =
-              execute(
-                  modules.finderApi.register(
-                      new PdaFinderDto.Register(
-                          code.trim(), name.trim(), modules.tokens.get("fcmToken"))));
-          modules.device.registered(registration.deviceId, registration.deviceSecret);
-          return () -> {
-            tasks.clearRetry();
-            modules.fcm.initialize();
-            com.company.pda.infrastructure.firebase.FinderPollingService.start(getApplication());
-            tasks.status.setValue("Device registered");
-          };
-        });
+    HttpReceiver<PdaFinderDto.Registration> httpReceiver =
+        registration -> {
+          tasks.clearRetry();
+          modules.fcm.initialize();
+          com.company.pda.infrastructure.firebase.FinderPollingService.start(getApplication());
+          tasks.status.setValue("Device registered");
+        };
+    tasks.runAsync(
+        "Registering device?",
+        () ->
+            modules
+                .finderApi
+                .register(
+                    new PdaFinderDto.Register(
+                        code.trim(), name.trim(), modules.tokens.get("fcmToken")))
+                .thenApplyAsync(
+                    registration -> {
+                      modules.device.registered(registration.deviceId, registration.deviceSecret);
+                      return registration;
+                    },
+                    modules.io),
+        httpReceiver);
   }
 
   public String suggestedDeviceCode() {

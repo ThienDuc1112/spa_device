@@ -1,5 +1,7 @@
 # 2. Database ERD
 
+> Database update: schema SQL in both `db/migration` and `db/legacy` now targets Oracle 19c. Earlier PostgreSQL migration/legacy-preservation notes below describe the previous version. Runtime integration remains PostgreSQL; see [current schema instructions](../pda-management/src/main/resources/db/README.md).
+
 ```mermaid
 erDiagram
  stores ||--o{ users : employs

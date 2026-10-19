@@ -13,6 +13,7 @@ public class JwtAuthenticationFilter extends org.springframework.web.filter.Once
 
   public JwtAuthenticationFilter(JwtDecoder decoder) {
     this.delegate = new BearerTokenAuthenticationFilter(authenticationManager(decoder));
+    this.delegate.setAuthenticationEntryPoint(new JsonAuthenticationEntryPoint());
   }
 
   @Override

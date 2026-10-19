@@ -62,4 +62,8 @@ public class MyBatisAuthRepository implements AuthRepository {
   public int revoke(UUID familyId) {
     return mapper.revoke(familyId);
   }
+
+  public boolean activeSession(UUID familyId, long userId) {
+    return mapper.activeSession(familyId, userId);
+  }
 }

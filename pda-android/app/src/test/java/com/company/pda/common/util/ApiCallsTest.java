@@ -234,6 +234,43 @@ public class ApiCallsTest {
         });
   }
 
+  private static <T> T await(CompletableFuture<T> request) throws IOException {
+    try {
+      return request.join();
+    } catch (CompletionException failure) {
+      if (failure.getCause() instanceof IOException error) throw error;
+      throw failure;
+    }
+  }
+
+  @Test
+  public void callApiReturnsBeforeResponseAndUsesWorkerThread() throws Exception {
+    var received = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    server.createContext(
+        "/resource",
+        exchange -> {
+          received.countDown();
+          try {
+            if (!release.await(5, TimeUnit.SECONDS)) throw new IOException("Test timed out");
+          } catch (InterruptedException error) {
+            throw new IOException(error);
+          }
+          respond(exchange, 200, "\"ok\"");
+        });
+    var workers = Executors.newSingleThreadExecutor();
+    try {
+      var result = api.<String>callApi("GET", "resource", null, String.class, Map.of(), workers);
+      assertTrue(received.await(5, TimeUnit.SECONDS));
+      assertFalse(result.isDone());
+      release.countDown();
+      assertEquals("ok", result.get(5, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+      workers.shutdownNow();
+    }
+  }
+
   @Test
   public void refreshesAndRetriesWithNewJwt() throws Exception {
     refreshEndpoint(200);
@@ -246,9 +283,72 @@ public class ApiCallsTest {
               "Bearer new".equals(exchange.getRequestHeaders().getFirst("Authorization"));
           respond(exchange, renewed ? 200 : 401, renewed ? "\"ok\"" : "{}");
         });
-    assertEquals("ok", api.<String>request("GET", "resource", null, String.class).execute());
+    assertEquals(
+        "ok",
+        await(api.<String>callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
     assertEquals(2, calls.get());
     assertEquals(1, refreshes.get());
+    assertEquals("rotated", store.tokens().refreshToken);
+  }
+
+  @Test
+  public void expiredAccessRefreshesBeforeSendingProtectedRequest() throws Exception {
+    store.tokens().accessExpiresAt = System.currentTimeMillis() - 1000;
+    store.tokens().sessionExpiresAt = System.currentTimeMillis() + 60000;
+    refreshEndpoint(200);
+    server.createContext(
+        "/resource",
+        exchange -> {
+          assertEquals("Bearer new", exchange.getRequestHeaders().getFirst("Authorization"));
+          assertEquals("ANDROID", exchange.getRequestHeaders().getFirst("PDA_TYPE"));
+          respond(exchange, 200, "\"ok\"");
+        });
+    assertEquals(
+        "ok",
+        await(api.<String>callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
+    assertEquals(1, refreshes.get());
+  }
+
+  @Test
+  public void revokedSessionIsNotRefreshed() {
+    refreshEndpoint(200);
+    server.createContext(
+        "/resource",
+        exchange ->
+            respond(exchange, 401, "{\"code\":\"SESSION_REVOKED\",\"detail\":\"Sign in again\"}"));
+    ApiException error =
+        assertThrows(
+            ApiException.class,
+            () ->
+                await(api.callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
+    assertEquals("SESSION_REVOKED", error.code);
+    assertEquals(0, refreshes.get());
+    assertNull(store.tokens());
+  }
+
+  @Test
+  public void expiredSessionDoesNotSendHttp() {
+    store.tokens().sessionExpiresAt = System.currentTimeMillis() - 1000;
+    ApiException error =
+        assertThrows(
+            ApiException.class,
+            () ->
+                await(api.callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
+    assertEquals("SESSION_EXPIRED", error.code);
+    assertNull(store.tokens());
+  }
+
+  @Test
+  public void explicitExtensionSendsOptInAndStoresRotatedTokens() {
+    server.createContext(
+        "/auth/refresh",
+        exchange -> {
+          assertEquals(
+              "{\"refreshToken\":\"refresh\",\"extendSession\":true}",
+              new String(exchange.getRequestBody(), StandardCharsets.UTF_8));
+          respond(exchange, 200, "{\"accessToken\":\"new\",\"refreshToken\":\"rotated\"}");
+        });
+    assertEquals("rotated", api.extendSession(Runnable::run).join().refreshToken);
     assertEquals("rotated", store.tokens().refreshToken);
   }
 
@@ -264,8 +364,11 @@ public class ApiCallsTest {
         });
     var error =
         assertThrows(
-            ApiException.class, () -> api.request("GET", "resource", null, String.class).execute());
+            ApiException.class,
+            () ->
+                await(api.callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
     assertEquals("Denied", error.getMessage());
+    assertNull(store.tokens());
     assertEquals(2, calls.get());
     assertEquals(1, refreshes.get());
   }
@@ -275,7 +378,8 @@ public class ApiCallsTest {
     refreshEndpoint(401);
     server.createContext("/resource", exchange -> respond(exchange, 401, "{}"));
     assertThrows(
-        ApiException.class, () -> api.request("GET", "resource", null, String.class).execute());
+        ApiException.class,
+        () -> await(api.callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
     assertNull(store.tokens());
   }
 
@@ -287,7 +391,10 @@ public class ApiCallsTest {
         503,
         assertThrows(
                 ApiException.class,
-                () -> api.request("GET", "resource", null, String.class).execute())
+                () ->
+                    await(
+                        api.callApi(
+                            "GET", "resource", null, String.class, Map.of(), Runnable::run)))
             .status);
     assertEquals("old", store.tokens().accessToken);
   }
@@ -306,8 +413,11 @@ public class ApiCallsTest {
           respond(exchange, 401, "{}");
         });
     assertThrows(
-        ApiException.class, () -> new AuthApi(api).login(new Login("user", "pass")).execute());
-    assertThrows(ApiException.class, () -> new PdaFinderApi(api).commands(42, "secret").execute());
+        ApiException.class,
+        () -> await(new AuthApi(api, Runnable::run).login(new Login("user", "pass"))));
+    assertThrows(
+        ApiException.class,
+        () -> await(new PdaFinderApi(api, Runnable::run).commands(42, "secret")));
     assertEquals(0, refreshes.get());
     assertNotNull(store.tokens());
   }
@@ -317,9 +427,9 @@ public class ApiCallsTest {
     server.createContext(
         "/pda/commands", exchange -> respond(exchange, 200, "[{\"command\":\"FIND\"}]"));
     server.createContext("/devices/token", exchange -> respond(exchange, 204, ""));
-    var finder = new PdaFinderApi(api);
-    assertEquals("FIND", finder.commands(1, "secret").execute().get(0).command);
-    assertNull(finder.token(1, "secret", null).execute());
+    var finder = new PdaFinderApi(api, Runnable::run);
+    assertEquals("FIND", await(finder.commands(1, "secret")).get(0).command);
+    assertNull(await(finder.token(1, "secret", null)));
   }
 
   @Test
@@ -330,22 +440,7 @@ public class ApiCallsTest {
           assertEquals("/products/barcode/a%2Fb%20%2B%3F", exchange.getRequestURI().getRawPath());
           respond(exchange, 200, "{}");
         });
-    assertNotNull(new ProductApi(api).product("a/b +?").execute());
-  }
-
-  @Test
-  public void cancelledRequestDoesNotReachServer() {
-    var calls = new AtomicInteger();
-    server.createContext(
-        "/resource",
-        exchange -> {
-          calls.incrementAndGet();
-          respond(exchange, 200, "{}");
-        });
-    var request = api.request("GET", "resource", null, String.class);
-    request.cancel();
-    assertThrows(IOException.class, request::execute);
-    assertEquals(0, calls.get());
+    assertNotNull(await(new ProductApi(api, Runnable::run).product("a/b +?")));
   }
 
   @Test
@@ -369,7 +464,10 @@ public class ApiCallsTest {
     var workers = Executors.newFixedThreadPool(2);
     try {
       Callable<String> call =
-          () -> api.<String>request("GET", "resource", null, String.class).execute();
+          () ->
+              await(
+                  api.<String>callApi(
+                      "GET", "resource", null, String.class, Map.of(), Runnable::run));
       var results = workers.invokeAll(List.of(call, call), 10, TimeUnit.SECONDS);
       for (var result : results) assertEquals("ok", result.get());
       assertEquals(1, refreshes.get());
@@ -388,7 +486,8 @@ public class ApiCallsTest {
           respond(exchange, 200, "{\"accessToken\":\"new\",\"refreshToken\":\"rotated\"}");
         });
     assertThrows(
-        ApiException.class, () -> api.request("GET", "resource", null, String.class).execute());
+        ApiException.class,
+        () -> await(api.callApi("GET", "resource", null, String.class, Map.of(), Runnable::run)));
     assertNull(store.tokens());
   }
 }

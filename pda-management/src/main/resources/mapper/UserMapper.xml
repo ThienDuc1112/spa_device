@@ -29,4 +29,9 @@
   <update id="revoke">
     UPDATE refresh_tokens SET revoked=true WHERE family_id=#{familyId}
   </update>
+  <select id="activeSession" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM refresh_tokens r JOIN users u ON u.id=r.user_id
+      WHERE r.family_id=#{familyId} AND r.user_id=#{userId} AND r.revoked=false
+        AND r.consumed_at IS NULL AND r.expires_at&gt;now() AND u.active=true)
+  </select>
 </mapper>

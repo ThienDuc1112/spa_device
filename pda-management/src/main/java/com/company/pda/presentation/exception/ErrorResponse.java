@@ -8,6 +8,13 @@ public final class ErrorResponse {
   private final int status;
   private final String detail;
   private final String instance;
+  private String code;
+
+  @com.fasterxml.jackson.annotation.JsonInclude(
+      com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  public String getCode() {
+    return code;
+  }
 
   private ErrorResponse(int status, String detail, String instance) {
     this.status = status;
@@ -37,8 +44,13 @@ public final class ErrorResponse {
 
   public static ResponseEntity<ErrorResponse> of(
       int status, String detail, javax.servlet.http.HttpServletRequest request) {
-    return ResponseEntity.status(status)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(new ErrorResponse(status, detail, request.getRequestURI()));
+    return of(status, null, detail, request);
+  }
+
+  public static ResponseEntity<ErrorResponse> of(
+      int status, String code, String detail, javax.servlet.http.HttpServletRequest request) {
+    ErrorResponse body = new ErrorResponse(status, detail, request.getRequestURI());
+    body.code = code;
+    return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
   }
 }

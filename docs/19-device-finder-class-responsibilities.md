@@ -107,7 +107,7 @@ Các interface `AlarmPlayer`, `VolumeController`, `AudioModeController` còn cho
 | Class | Làm gì? | Vì sao tách riêng? |
 |---|---|---|
 | `PendingEvent` cùng lớp truy cập Room | Lưu sự kiện chờ gửi như `RINGING`, `STOPPED`, `FAILED`. | Giữ sự kiện đã lưu khi mạng tạm thời không dùng được. |
-| `SyncWorker` | Gửi sự kiện và cập nhật token; thử lại khi lỗi có thể phục hồi. | Việc đồng bộ không phụ thuộc phiên chuông còn chạy hay không. |
+| `SyncJobService` | Gửi sự kiện và cập nhật token; thử lại khi lỗi có thể phục hồi. | Việc đồng bộ không phụ thuộc phiên chuông còn chạy hay không. |
 | React `App` | Đọc danh sách và request gần nhất mỗi khoảng 5 giây hoặc khi bấm Làm mới. | Website hiển thị ACK Android đã gửi lên server. |
 
 ## 8. Đánh giá mức độ cần thiết

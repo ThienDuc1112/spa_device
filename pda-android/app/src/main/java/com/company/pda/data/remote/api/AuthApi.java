@@ -2,19 +2,24 @@ package com.company.pda.data.remote.api;
 
 import com.company.pda.common.util.ApiCalls;
 import com.company.pda.data.remote.dto.auth.AuthDto.*;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 public final class AuthApi {
   private final ApiCalls api;
+  private final Executor executor;
 
-  public AuthApi(ApiCalls api) {
+  public AuthApi(ApiCalls api, Executor executor) {
     this.api = api;
+    this.executor = executor;
   }
 
-  public ApiCalls.Request<Tokens> login(Login body) {
-    return api.request("POST", "auth/login", body, Tokens.class);
+  public CompletableFuture<Tokens> login(Login body) {
+    return api.callApi("POST", "auth/login", body, Tokens.class, Map.of(), executor);
   }
 
-  public ApiCalls.Request<Tokens> refresh(Refresh body) {
-    return api.request("POST", "auth/refresh", body, Tokens.class);
+  public CompletableFuture<Tokens> refresh(Refresh body) {
+    return api.callApi("POST", "auth/refresh", body, Tokens.class, Map.of(), executor);
   }
 }

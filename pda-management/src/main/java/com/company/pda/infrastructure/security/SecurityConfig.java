@@ -10,7 +10,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
@@ -32,12 +31,16 @@ public class SecurityConfig {
   }
 
   @Bean
-  JwtDecoder decoder(SecretKeySpec key, @Value("${app.issuer}") String issuer) {
+  JwtDecoder decoder(
+      SecretKeySpec key,
+      @Value("${app.issuer}") String issuer,
+      com.company.pda.domain.auth.repository.AuthRepository sessions) {
     lombok.val decoder =
         NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
     decoder.setJwtValidator(
         new DelegatingOAuth2TokenValidator<>(
             JwtValidators.createDefaultWithIssuer(issuer),
+            new SessionValidator(sessions),
             jwt ->
                 "access".equals(jwt.getClaimAsString("type"))
                         && jwt.getAudience().contains("retail-api")
@@ -66,7 +69,7 @@ public class SecurityConfig {
                     .authenticated())
         .exceptionHandling(
             e ->
-                e.authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
+                e.authenticationEntryPoint(new JsonAuthenticationEntryPoint())
                     .accessDeniedHandler(new BearerTokenAccessDeniedHandler()))
         .addFilterAt(new JwtAuthenticationFilter(decoder), BearerTokenAuthenticationFilter.class)
         .build();

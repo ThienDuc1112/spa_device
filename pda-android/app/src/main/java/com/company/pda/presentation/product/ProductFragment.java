@@ -1,7 +1,5 @@
 package com.company.pda.presentation.product;
 
-import static com.company.pda.common.util.ApiCalls.execute;
-
 import android.os.Bundle;
 import android.view.*;
 import android.widget.*;
@@ -20,6 +18,7 @@ import com.company.pda.presentation.home.HomeActivity;
 import com.company.scanner.api.ScanCallback;
 import com.company.scanner.api.ScanResult;
 import com.company.scanner.api.ScannerManager;
+import java.util.concurrent.CompletionException;
 
 public class ProductFragment extends Fragment {
   private HomeActivity home;
@@ -97,30 +96,47 @@ public class ProductFragment extends Fragment {
       tasks.error.setValue(e.getMessage());
       return;
     }
-    tasks.run(
+    HttpReceiver<LookupResult> httpReceiver =
+        result -> {
+          tasks.clearRetry();
+          tasks.status.setValue(result.cached ? "Offline - cached product" : "Product found");
+          home.select(result.product);
+        };
+    tasks.runAsync(
         "Looking up product...",
-        () -> {
-          com.company.pda.domain.model.Product product;
-          boolean cached = false;
-          try {
-            product = new ProductMapper().toDomain(execute(modules.productsApi.product(barcode)));
-            modules.database.products().cache(ProductCache.from(product));
-          } catch (ApiException e) {
-            throw e;
-          } catch (java.io.IOException e) {
-            var row = modules.database.products().product(barcode);
-            if (row == null) throw e;
-            product = row.product();
-            cached = true;
-          }
-          var result = product;
-          boolean fromCache = cached;
-          return () -> {
-            tasks.clearRetry();
-            tasks.status.setValue(fromCache ? "Offline - cached product" : "Product found");
-            home.select(result);
-          };
-        });
+        () ->
+            modules
+                .productsApi
+                .product(barcode)
+                .handleAsync(
+                    (response, failure) -> {
+                      if (failure == null) {
+                        var product = new ProductMapper().toDomain(response);
+                        modules.database.products().cache(ProductCache.from(product));
+                        return new LookupResult(product, false);
+                      }
+                      Throwable cause = failure;
+                      while (cause instanceof CompletionException && cause.getCause() != null)
+                        cause = cause.getCause();
+                      if (cause instanceof java.io.IOException
+                          && !(cause instanceof ApiException)) {
+                        var row = modules.database.products().product(barcode);
+                        if (row != null) return new LookupResult(row.product(), true);
+                      }
+                      throw new CompletionException(cause);
+                    },
+                    modules.io),
+        httpReceiver);
+  }
+
+  private static final class LookupResult {
+    final com.company.pda.domain.model.Product product;
+    final boolean cached;
+
+    LookupResult(com.company.pda.domain.model.Product product, boolean cached) {
+      this.product = product;
+      this.cached = cached;
+    }
   }
 
   public void render() {
@@ -149,7 +165,7 @@ public class ProductFragment extends Fragment {
     if (home.selected != null) {
       var p = home.selected;
       ui.text(p.productName, 22);
-      ui.text(p.productCode + " • " + p.barcode, 14);
+      ui.text(p.productCode + " â€¢ " + p.barcode, 14);
       var image = new ImageView(requireContext());
       image.setContentDescription("Product image");
       ui.content.addView(image, new LinearLayout.LayoutParams(-1, 400));
@@ -165,7 +181,7 @@ public class ProductFragment extends Fragment {
     }
     ui.text("Scanned items (" + home.scanned.size() + ")", 18);
     for (var p : home.scanned)
-      ui.button(p.productCode + " · " + p.productName, () -> home.select(p));
+      ui.button(p.productCode + " Â· " + p.productName, () -> home.select(p));
   }
 
   public void onDestroyView() {

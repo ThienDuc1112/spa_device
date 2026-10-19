@@ -1,7 +1,5 @@
 package com.company.pda.presentation.disposal;
 
-import static com.company.pda.common.util.ApiCalls.execute;
-
 import android.os.Bundle;
 import android.view.*;
 import androidx.annotation.NonNull;
@@ -51,27 +49,21 @@ public class DisposalFragment extends Fragment {
   }
 
   private void load(int page) {
-    tasks.run(
-        "Loading disposals...",
-        () -> {
-          var rows = execute(modules.disposalsApi.list(page));
-          return () -> {
-            tasks.clearRetry();
-            render(new DisposalUiState(rows, null, page));
-          };
-        });
+    HttpReceiver<List<DisposalDto>> httpReceiver =
+        rows -> {
+          tasks.clearRetry();
+          render(new DisposalUiState(rows, null, page));
+        };
+    tasks.request("Loading disposals...", () -> modules.disposalsApi.list(page), httpReceiver);
   }
 
   private void detail(String id) {
-    tasks.run(
-        "Loading disposal...",
-        () -> {
-          var row = execute(modules.disposalsApi.detail(id));
-          return () -> {
-            tasks.clearRetry();
-            render(new DisposalUiState(state.list(), row, state.page()));
-          };
-        });
+    HttpReceiver<DisposalDto.Detail> httpReceiver =
+        row -> {
+          tasks.clearRetry();
+          render(new DisposalUiState(state.list(), row, state.page()));
+        };
+    tasks.request("Loading disposal...", () -> modules.disposalsApi.detail(id), httpReceiver);
   }
 
   private void create(String code, String quantity, String reason) {
@@ -87,35 +79,38 @@ public class DisposalFragment extends Fragment {
             UUID.randomUUID().toString(),
             reason,
             List.of(new DisposalDto.Line(code, count, reason)));
-    tasks.run(
+    HttpReceiver<DisposalDto.Detail> httpReceiver =
+        row -> {
+          tasks.clearRetry();
+          render(new DisposalUiState(state.list(), row, state.page()));
+        };
+    tasks.runAsync(
         "Creating disposal...",
-        () -> {
-          var created = execute(modules.disposalsApi.create(body));
-          var row = execute(modules.disposalsApi.detail(created.id));
-          return () -> {
-            tasks.clearRetry();
-            render(new DisposalUiState(state.list(), row, state.page()));
-          };
-        });
+        () ->
+            modules
+                .disposalsApi
+                .create(body)
+                .thenCompose(created -> modules.disposalsApi.detail(created.id)),
+        httpReceiver);
   }
 
   private void transition(boolean confirm) {
     if (state.detail() == null) return;
     String id = state.detail().disposal.id;
     var body = new DisposalDto.Transition(state.detail().disposal.version);
-    tasks.run(
+    HttpReceiver<DisposalDto.Detail> httpReceiver =
+        row -> {
+          tasks.clearRetry();
+          render(new DisposalUiState(state.list(), row, state.page()));
+        };
+    tasks.runAsync(
         confirm ? "Confirming disposal..." : "Cancelling disposal...",
-        () -> {
-          execute(
-              confirm
-                  ? modules.disposalsApi.confirm(id, body)
-                  : modules.disposalsApi.cancel(id, body));
-          var row = execute(modules.disposalsApi.detail(id));
-          return () -> {
-            tasks.clearRetry();
-            render(new DisposalUiState(state.list(), row, state.page()));
-          };
-        });
+        () ->
+            (confirm
+                    ? modules.disposalsApi.confirm(id, body)
+                    : modules.disposalsApi.cancel(id, body))
+                .thenCompose(ignored -> modules.disposalsApi.detail(id)),
+        httpReceiver);
   }
 
   private void render(DisposalUiState state) {
@@ -126,7 +121,14 @@ public class DisposalFragment extends Fragment {
       ui.text(d.disposal.remarks, 22);
       ui.text(d.disposal.status + "\n" + d.disposal.id, 14);
       for (var item : d.items)
-        ui.text("Product #" + item.productId + " â€¢ " + item.quantity + " â€¢ " + item.reason, 16);
+        ui.text(
+            "Product #"
+                + item.productId
+                + " ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ "
+                + item.quantity
+                + " ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ "
+                + item.reason,
+            16);
       ui.text("History", 18);
       for (var h : d.history) ui.text(h.toString(), 12);
       if (d.disposal.status.equals("PENDING")) {
@@ -147,7 +149,7 @@ public class DisposalFragment extends Fragment {
     }
     if (home.selected != null) ui.button("Dispose " + home.selected.productCode, this::create);
     if (state.list().isEmpty()) ui.text("No disposals on this page", 18);
-    for (var d : state.list()) ui.button(d.status + " Â· " + d.remarks, () -> detail(d.id));
+    for (var d : state.list()) ui.button(d.status + " Ãƒâ€šÃ‚Â· " + d.remarks, () -> detail(d.id));
     if (state.page() > 0) ui.button("Previous page", () -> load(state.page() - 1));
     if (state.list().size() == 50) ui.button("Next page", () -> load(state.page() + 1));
     ui.button("Refresh", () -> load(state.page()));

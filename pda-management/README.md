@@ -36,7 +36,9 @@ pda-management/
 
 ## Database migrations
 
-New databases use `classpath:db/migration` and apply these scripts in order:
+The SQL scripts now target **Oracle 19c**. JDBC configuration, MyBatis queries and integration tests still target PostgreSQL; this is a schema-script conversion, not a completed backend database migration. See [Oracle schema instructions](src/main/resources/db/README.md).
+
+New Oracle schemas can use `classpath:db/migration` and apply these scripts in order after the runtime has been adapted:
 
 1. `V1__create_auth_tables.sql`: stores, users, roles, refresh tokens and audit logs.
 2. `V2__create_device_tables.sql`: registered devices.
@@ -46,7 +48,7 @@ New databases use `classpath:db/migration` and apply these scripts in order:
 6. `V6__create_disposal_tables.sql`: disposal documents, items, history and the inventory-to-disposal foreign key.
 7. `V7__allow_web_finder_requests.sql`: nullable requester for the unauthenticated React finder website; included in the legacy history too.
 
-For a database that already applied the former `V1__retail_schema.sql`, set `SPRING_FLYWAY_LOCATIONS=classpath:db/legacy` before starting the application. That directory retains the original migration byte-for-byte. Select only one migration location; combining both histories duplicates version 1. The restructure does not reset an existing database or rewrite its Flyway history. New database schema changes start at V7; the web finder migration is included in both histories.
+The `db/legacy` scripts have also been converted to Oracle. They are an alternative combined schema for a new Oracle database, not the original PostgreSQL Flyway history. Do not apply these edited scripts to an existing PostgreSQL history or combine both locations. Preserve the previous application version's migrations for existing PostgreSQL deployments.
 
 ## Layer boundaries
 

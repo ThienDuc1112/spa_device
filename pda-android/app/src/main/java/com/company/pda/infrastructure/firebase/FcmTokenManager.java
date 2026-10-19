@@ -21,14 +21,14 @@ public class FcmTokenManager {
           .addOnSuccessListener(this::refreshed)
           .addOnFailureListener(error -> failed("TOKEN_ERROR"));
     }
-    SyncWorker.schedule(context);
+    SyncJobService.schedule(context);
   }
 
   public void refreshed(String token) {
     tokens.put("fcmToken", token);
     // Obtaining a token repairs token errors, but does not prove message delivery recovered.
     if (!"DELIVERY_ERROR".equals(tokens.get("fcmFailure"))) tokens.put("fcmFailure", null);
-    SyncWorker.schedule(context);
+    SyncJobService.schedule(context);
   }
 
   public boolean unavailable() {

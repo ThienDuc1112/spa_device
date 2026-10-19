@@ -43,14 +43,14 @@ sequenceDiagram
     end
     PDA->>Alarm: FIND hợp lệ, chưa xử lý
     Alarm->>Alarm: Phát chuông + rung lặp + đặt timeout
-    PDA->>API: POST /pda/events: RINGING qua SyncWorker
+    PDA->>API: POST /pda/events: RINGING qua SyncJobService
     Web->>API: POST /web/finder/requests/{requestId}/stop
     API->>DB: Đổi trạng thái STOPPED + outbox STOP
     PDA->>API: GET /pda/commands
     API-->>PDA: STOP cho request
     PDA->>Alarm: Dừng phiên tương ứng
     Alarm->>Alarm: Dừng chuông, hủy rung và timeout
-    PDA->>API: POST /pda/events: STOPPED qua SyncWorker
+    PDA->>API: POST /pda/events: STOPPED qua SyncJobService
 ```
 
 Backend mặc định đặt thời hạn tìm là 900 giây (15 phút) bằng `FINDER_TIMEOUT_SECONDS`; service giới hạn cấu hình trong khoảng 10–900 giây. Mỗi PDA chỉ có một request đang hoạt động; tạo thêm khi request cũ còn hoạt động trả HTTP 409.
@@ -85,7 +85,7 @@ Không có lệnh thì trả `[]`. Backend xác thực bằng credential thiết
 | Thiếu `deviceId` hoặc `deviceSecret` | Dừng service |
 | Service bị hủy | Hủy HTTP đang chạy, executor, callback và wake lock |
 
-Đây là polling tuần tự bằng `ScheduledExecutorService`, không phải long polling hoặc WorkManager định kỳ. Lượt đầu chạy ngay khi service bắt đầu. Thời gian giữa hai lượt gồm thời gian HTTP cộng khoảng chờ; vì vậy “5 giây” không phải cam kết nhận lệnh trong 5 giây. Network client cấu hình connect timeout 10 giây, read timeout 20 giây và call timeout 30 giây.
+Đây là polling tuần tự bằng `ScheduledExecutorService`, không phải long polling hoặc JobScheduler định kỳ. Lượt đầu chạy ngay khi service bắt đầu. Thời gian giữa hai lượt gồm thời gian HTTP cộng khoảng chờ; vì vậy “5 giây” không phải cam kết nhận lệnh trong 5 giây. Network client cấu hình connect timeout 10 giây, read timeout 20 giây và call timeout 30 giây.
 
 APK polling bỏ qua FIND/STOP nhận qua FCM. `/pda/fcm-health` không được gọi trong vòng polling và không quyết định đổi transport; Home vẫn có thể gọi health một lần khi resume để kiểm tra đăng ký.
 
@@ -95,7 +95,7 @@ APK polling bỏ qua FIND/STOP nhận qua FCM. `/pda/fcm-health` không được
 
 STOP ghi dấu `handled:<requestId>` trước khi dừng phiên tương ứng. Dấu này chặn FIND đến trễ khởi động lại phiên đã dừng. STOP cho request khác không dừng phiên đang hoạt động.
 
-Sự kiện `RINGING`, `STOPPED`, `FAILED` được ghi vào Room rồi gửi `POST /pda/events` bằng `SyncWorker` khi có mạng. Lỗi tạm thời được retry theo WorkManager với backoff exponential bắt đầu từ 30 giây. Đây là luồng ACK riêng, không phải vòng polling 5 giây. Trạng thái website có thể cập nhật trễ khi ACK còn trong hàng đợi.
+Sự kiện `RINGING`, `STOPPED`, `FAILED` được ghi vào Room rồi gửi `POST /pda/events` bằng `SyncJobService` khi có mạng. Lỗi tạm thời được retry theo JobScheduler với backoff exponential bắt đầu từ 30 giây. Đây là luồng ACK riêng, không phải vòng polling 5 giây. Trạng thái website có thể cập nhật trễ khi ACK còn trong hàng đợi.
 
 ## 5. Chuông và rung trên Android
 
@@ -147,7 +147,7 @@ Với một lượt tìm thành công, tra cùng `requestId` theo thứ tự: `F
 - `expired` kèm `deadlineMs/nowMs`: đối chiếu deadline backend và giờ hệ thống PDA. `already handled or active` là chống lệnh trùng.
 - `foreground service start rejected`: xem exception, trạng thái app và quyền service. `notificationsEnabled=false` giải thích việc không thấy thông báo; riêng log này không chứng minh service không chạy.
 - `audio start result` hoặc `alarm failed`: xem `reason/detail` và bước `FinderAudio` cuối cùng, đặc biệt DND, audio focus, âm lượng và chọn loa. `MediaPlayer setup/start failed` có stack trace.
-- PDA có `RINGING` nhưng website chưa cập nhật: kiểm tra `event persisted`, `worker start`, `event ACK succeeded` hoặc HTTP/retry ở `FinderSync`. WorkManager chờ mạng có thể chưa chạy ngay.
+- PDA có `RINGING` nhưng website chưa cập nhật: kiểm tra `event persisted`, `job start`, `event ACK succeeded` hoặc HTTP/retry ở `FinderSync`. JobScheduler chờ mạng có thể chưa chạy ngay.
 - `deadline reached`, `notification STOP`, `controller STOP`, audio focus change và `onDestroy` giúp xác định nguồn dừng. `onDestroy` đơn lẻ không xác định được lý do hệ điều hành hủy service; cần xem thêm log hệ thống.
 
 Log không ghi device secret, FCM token, header xác thực hoặc toàn bộ response body. Lỗi HTTP ghi mã trạng thái; lỗi mạng/Android có stack trace. Debug log polling xuất mỗi lượt, audio health tối đa mỗi 10 giây khi bình thường. `RINGING` và `vibration requested` xác nhận phần mềm đã yêu cầu phát/rung; vẫn cần kiểm tra loa/motor thực tế trên PDA.
@@ -161,7 +161,7 @@ Log không ghi device secret, FCM token, header xác thực hoặc toàn bộ re
 | Gọi commands khi bật polling | [FinderPollingCycle.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderPollingCycle.java) |
 | Kiểm tra FIND/STOP và chống lệnh trùng | [FinderCommandHandler.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/FinderCommandHandler.java) |
 | Chuông, rung và cleanup | [PdaAlarmService.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/alarm/PdaAlarmService.java) |
-| Hàng đợi ACK và retry | [SyncWorker.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncWorker.java) |
+| Hàng đợi ACK và retry | [SyncJobService.java](../pda-android/app/src/main/java/com/company/pda/infrastructure/firebase/SyncJobService.java) |
 | HTTP commands/events | [PdaFinderController.java](../pda-management/src/main/java/com/company/pda/presentation/rest/pdafinder/PdaFinderController.java) |
 | Ánh xạ trạng thái thành FIND/STOP | [PdaFinderService.java](../pda-management/src/main/java/com/company/pda/application/pdafinder/service/PdaFinderService.java) |
 | Truy vấn request chưa hết hạn | [PdaFindMapper.xml](../pda-management/src/main/resources/mapper/PdaFindMapper.xml) |

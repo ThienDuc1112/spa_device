@@ -22,7 +22,7 @@ public class SecurityCurrentActor implements CurrentActor {
     if (user == null
         || !user.active()
         || user.storeId() != ((Number) jwt.getClaim("storeId")).longValue())
-      throw new DomainException(401, "Session no longer valid");
+      throw new DomainException(401, "SESSION_REVOKED", "Session no longer valid");
     return new Actor(user.id(), user.storeId());
   }
 }

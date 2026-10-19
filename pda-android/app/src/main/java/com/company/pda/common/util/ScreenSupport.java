@@ -63,8 +63,13 @@ public final class ScreenSupport {
   }
 
   public static void login(AppCompatActivity activity) {
+    login(activity, null);
+  }
+
+  public static void login(AppCompatActivity activity, String message) {
     activity.startActivity(
         new Intent(activity, LoginActivity.class)
+            .putExtra("sessionMessage", message)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
     activity.finish();
   }

@@ -23,25 +23,34 @@ public class JwtTokenProvider implements TokenProvider {
     this.issuer = issuer;
     lombok.val decoder =
         NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
-    decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+    decoder.setJwtValidator(
+        new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefaultWithIssuer(issuer),
+            jwt ->
+                jwt.getExpiresAt() != null && jwt.getExpiresAt().isAfter(Instant.now())
+                    ? org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success()
+                    : org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
+                        new org.springframework.security.oauth2.core.OAuth2Error(
+                            "SESSION_EXPIRED"))));
     refreshDecoder = decoder;
   }
 
-  public String access(User user, List<String> roles, Instant now) {
+  public String access(User user, List<String> roles, Instant now, Instant expiresAt, UUID family) {
     return encode(
         JwtClaimsSet.builder()
             .issuer(issuer)
             .subject("" + user.id())
             .audience(java.util.Arrays.asList("retail-api"))
             .issuedAt(now)
-            .expiresAt(now.plusSeconds(900))
+            .expiresAt(expiresAt)
+            .claim("sessionId", family.toString())
             .claim("type", "access")
             .claim("storeId", user.storeId())
             .claim("roles", roles)
             .build());
   }
 
-  public String refresh(User user, UUID id, Instant now) {
+  public String refresh(User user, UUID id, Instant now, Instant expiresAt) {
     return encode(
         JwtClaimsSet.builder()
             .issuer(issuer)
@@ -49,7 +58,7 @@ public class JwtTokenProvider implements TokenProvider {
             .audience(java.util.Arrays.asList("retail-refresh"))
             .id(id.toString())
             .issuedAt(now)
-            .expiresAt(now.plus(Duration.ofDays(14)))
+            .expiresAt(expiresAt)
             .claim("type", "refresh")
             .build());
   }
@@ -59,10 +68,17 @@ public class JwtTokenProvider implements TokenProvider {
       lombok.val jwt = refreshDecoder.decode(token);
       if (!"refresh".equals(jwt.getClaimAsString("type"))
           || !jwt.getAudience().contains("retail-refresh"))
-        throw new DomainException(401, "Invalid refresh token");
+        throw new DomainException(401, "REFRESH_TOKEN_INVALID", "Invalid refresh token");
       return UUID.fromString(jwt.getId());
+    } catch (JwtValidationException e) {
+      boolean expired =
+          e.getErrors().stream().anyMatch(error -> "SESSION_EXPIRED".equals(error.getErrorCode()));
+      throw new DomainException(
+          401,
+          expired ? "SESSION_EXPIRED" : "REFRESH_TOKEN_INVALID",
+          expired ? "Session expired; sign in again" : "Invalid refresh token");
     } catch (JwtException | IllegalArgumentException e) {
-      throw new DomainException(401, "Invalid refresh token");
+      throw new DomainException(401, "REFRESH_TOKEN_INVALID", "Invalid refresh token");
     }
   }
 

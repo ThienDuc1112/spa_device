@@ -15,7 +15,7 @@ flowchart LR
   Receiver --> Handler[FinderCommandHandler]
   Handler --> Alarm[PdaAlarmService]
   Alarm --> Audio[AndroidAlarmAdapter]
-  Alarm --> Sync[Room + SyncWorker]
+  Alarm --> Sync[Room + SyncJobService]
   Sync --> Events[POST /pda/events]
   Events --> DB
   Web --> List[GET /web/finder/devices]
@@ -26,7 +26,7 @@ flowchart LR
 
 Home mở form nếu PDA chưa có ID/secret. Nhân viên hoặc quản lý nhập mã tài sản/tên (đã có giá trị gợi ý), bấm Register. `POST /devices/register` có JWT, cửa hàng lấy từ tài khoản. Android lưu secret, đồng bộ FCM token. Lần đăng nhập sau không tạo thêm thiết bị; cửa hàng đăng ký không tự đổi theo tài khoản khác. Có nút Register trên Home để làm lại nếu trước đó bỏ qua form.
 
-Không cần token ngay lúc đăng ký; khi có token SDK, `SyncWorker` cập nhật bằng `PUT /devices/token` với credential thiết bị. Máy chọn FCM cần token hợp lệ để nhận lệnh, không tự chuyển polling khi thiếu token.
+Không cần token ngay lúc đăng ký; khi có token SDK, `SyncJobService` cập nhật bằng `PUT /devices/token` với credential thiết bị. Máy chọn FCM cần token hợp lệ để nhận lệnh, không tự chuyển polling khi thiếu token.
 
 ## Gửi yêu cầu từ web
 
@@ -52,7 +52,7 @@ Lỗi phát báo FAILED; FIND FCM bị hạ priority hoặc start service bị c
 
 ## ACK và dừng
 
-RINGING/STOPPED/FAILED được lưu Room rồi SyncWorker gửi `POST /pda/events` bằng ID/secret của PDA. Backend kiểm tra đúng thiết bị/request, không cho trạng thái terminal quay lại active. Website refresh danh sách mỗi khoảng 5 giây và có nút Làm mới; cùng endpoint mang trạng thái request gần nhất.
+RINGING/STOPPED/FAILED được lưu Room rồi SyncJobService gửi `POST /pda/events` bằng ID/secret của PDA. Backend kiểm tra đúng thiết bị/request, không cho trạng thái terminal quay lại active. Website refresh danh sách mỗi khoảng 5 giây và có nút Làm mới; cùng endpoint mang trạng thái request gần nhất.
 
 Nút Dừng trên web gọi `POST /web/finder/requests/{id}/stop`: cập nhật STOPPED, outbox STOP và audit; có thể dừng trực tiếp tại notification/dialog PDA hoặc tự dừng khi hết hạn. STOPPED từ web chưa chứng minh PDA đã nhận STOP; thiết bị offline vẫn tự kiểm tra deadline cục bộ. RINGING chưa chứng minh người dùng đã nghe loa.
 

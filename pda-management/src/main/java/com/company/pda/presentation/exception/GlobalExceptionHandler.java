@@ -14,7 +14,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DomainException.class)
   ResponseEntity<ErrorResponse> business(
       DomainException e, javax.servlet.http.HttpServletRequest request) {
-    return ErrorResponse.of(e.status, e.getMessage(), request);
+    return ErrorResponse.of(e.status, e.code, e.getMessage(), request);
   }
 
   @ExceptionHandler({
@@ -48,6 +48,9 @@ public class GlobalExceptionHandler {
     String ref = java.util.UUID.randomUUID().toString();
     log.error("Unhandled failure {}", ref, e);
     return ErrorResponse.of(
-        HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal error; reference " + ref, request);
+        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+        "/auth/refresh".equals(request.getRequestURI()) ? "TOKEN_REFRESH_FAILED" : null,
+        "Internal error; reference " + ref,
+        request);
   }
 }

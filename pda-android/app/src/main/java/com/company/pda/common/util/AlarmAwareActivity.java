@@ -4,7 +4,7 @@ import android.content.*;
 import androidx.appcompat.app.*;
 import com.company.pda.infrastructure.alarm.PdaAlarmService;
 
-public abstract class AlarmAwareActivity extends AppCompatActivity {
+public abstract class AlarmAwareActivity extends BaseActivity {
   private AlertDialog dialog;
   private final BroadcastReceiver receiver =
       new BroadcastReceiver() {
