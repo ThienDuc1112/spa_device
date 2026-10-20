@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.*;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +25,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.*;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
     properties = {
@@ -122,7 +126,7 @@ class StoreFlowsIT {
   }
 
   ResultActions postJson(String path, String token, Object content) throws Exception {
-    lombok.val request =
+    final MockHttpServletRequestBuilder request =
         post(path)
             .contentType(MediaType.APPLICATION_JSON)
             .content(json.writeValueAsString(content));
@@ -164,8 +168,8 @@ class StoreFlowsIT {
 
   @Test
   void refreshRotatesAndReuseRevokesFamily() throws Exception {
-    lombok.val initial = login("user1");
-    lombok.val rotated =
+    final JsonNode initial = login("user1");
+    final JsonNode rotated =
         body(
             postJson(
                     "/auth/refresh",
@@ -273,7 +277,7 @@ class StoreFlowsIT {
 
   @Test
   void refreshTokenCannotAccessApi() throws Exception {
-    lombok.val tokens = login("user1");
+    final JsonNode tokens = login("user1");
     mvc.perform(
             get("/products/barcode/123")
                 .header("Authorization", "Bearer " + tokens.get("refreshToken").asText()))
@@ -354,7 +358,7 @@ class StoreFlowsIT {
   void rejectsNegativeAndOverPrecisionQuantities() throws Exception {
     postJson("/inventory-adjustments", manager, adjustment(UUID.randomUUID(), 0, -1))
         .andExpect(status().isBadRequest());
-    lombok.val b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 1));
+    final HashMap<String, Object> b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 1));
     b.put("quantity", new BigDecimal("1.001"));
     postJson("/inventory-adjustments", manager, b).andExpect(status().isBadRequest());
   }
@@ -371,9 +375,9 @@ class StoreFlowsIT {
 
   @Test
   void websiteDeletesDeviceHistoryAndAllowsFreshRegistration() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long deviceId = device.get("deviceId").asLong();
-    lombok.val otherDevice =
+    final JsonNode otherDevice =
         body(
             postJson(
                     "/devices/register",
@@ -387,7 +391,7 @@ class StoreFlowsIT {
                         "keep-token"))
                 .andExpect(status().isOk())
                 .andReturn());
-    lombok.val request =
+    final JsonNode request =
         body(
             mvc.perform(post("/web/finder/devices/" + deviceId + "/find"))
                 .andExpect(status().isOk())
@@ -474,7 +478,7 @@ class StoreFlowsIT {
             mapOf("deviceCode", "PDA2", "deviceName", "Second PDA", "fcmToken", "second-token"))
         .andExpect(status().isOk());
     db.update("INSERT INTO stores(id,store_code,store_name) VALUES(3,'S3','Empty store')");
-    lombok.val result =
+    final MvcResult result =
         mvc.perform(get("/web/finder/devices"))
             .andExpect(status().isOk())
             .andExpect(header().string("Cache-Control", "no-store"))
@@ -493,7 +497,7 @@ class StoreFlowsIT {
 
   @Test
   void websiteFindStopUsesRealStoreOutboxAndAnonymousAudit() throws Exception {
-    lombok.val device =
+    final JsonNode device =
         body(
             postJson(
                     "/devices/register",
@@ -508,7 +512,7 @@ class StoreFlowsIT {
                 .andExpect(status().isOk())
                 .andReturn());
     long id = device.get("deviceId").asLong();
-    lombok.val request =
+    final JsonNode request =
         body(
             mvc.perform(post("/web/finder/devices/" + id + "/find"))
                 .andExpect(status().isOk())
@@ -554,9 +558,10 @@ class StoreFlowsIT {
 
   @Test
   void employeeCanRegisterOwnPdaAfterLoginButAnonymousCannot() throws Exception {
-    lombok.val command = mapOf("deviceCode", "EMPLOYEE-PDA", "deviceName", "Employee PDA");
+    final Map<String, Object> command =
+        mapOf("deviceCode", "EMPLOYEE-PDA", "deviceName", "Employee PDA");
     postJson("/devices/register", "", command).andExpect(status().isUnauthorized());
-    lombok.val registration =
+    final JsonNode registration =
         body(
             postJson("/devices/register", employee, command)
                 .andExpect(status().isOk())
@@ -578,7 +583,7 @@ class StoreFlowsIT {
 
   @Test
   void fcmHealthAuthenticatesDeviceAndTracksLatestPushResultOnly() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
     mvc.perform(get("/pda/fcm-health").header("X-Device-Id", id).header("X-Device-Secret", "wrong"))
@@ -588,12 +593,12 @@ class StoreFlowsIT {
         .andExpect(header().string("Cache-Control", "no-store"))
         .andExpect(jsonPath("fallbackRequired").value(true))
         .andExpect(jsonPath("reason").value("FCM_DISABLED"));
-    lombok.val request =
+    final JsonNode request =
         body(
             postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
                 .andReturn());
-    lombok.val requestId = UUID.fromString(request.get("id").asText());
+    final UUID requestId = UUID.fromString(request.get("id").asText());
     assertNull(finderRequests.lastPushEvent(id, 1));
     doThrow(new IllegalStateException("FCM unavailable"))
         .when(push)
@@ -611,10 +616,10 @@ class StoreFlowsIT {
 
   @Test
   void finderPersistsPushAndInvalidTokenIsRemoved() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
     postJson("/pda/find", other, mapOf("deviceId", id)).andExpect(status().isNotFound());
-    lombok.val request =
+    final JsonNode request =
         body(
             postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
@@ -632,10 +637,10 @@ class StoreFlowsIT {
 
   @Test
   void pollingSurvivesPushFailureAndDeliversStopWithDeviceIsolation() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
-    lombok.val request =
+    final JsonNode request =
         body(
             postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
@@ -652,7 +657,7 @@ class StoreFlowsIT {
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].requestId").value(requestId))
         .andExpect(jsonPath("$[0].command").value("FIND"));
-    lombok.val another =
+    final JsonNode another =
         body(
             postJson(
                     "/devices/register",
@@ -690,7 +695,7 @@ class StoreFlowsIT {
 
   @Test
   void exhaustedPushRetriesLeavePollingAvailableUntilExpiry() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
     postJson("/pda/find", manager, mapOf("deviceId", id)).andExpect(status().isOk());
     db.update("UPDATE outbox_events SET attempts=7");
@@ -712,7 +717,7 @@ class StoreFlowsIT {
 
   @Test
   void deviceWithoutFirebaseCanRegisterAndReceiveCommands() throws Exception {
-    lombok.val device =
+    final JsonNode device =
         body(
             postJson(
                     "/devices/register",
@@ -734,9 +739,9 @@ class StoreFlowsIT {
 
   @Test
   void finderAckRequiresDeviceSecretAndExpiredRequestsDoNotSend() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
-    lombok.val request =
+    final JsonNode request =
         body(
             postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
@@ -765,15 +770,14 @@ class StoreFlowsIT {
     java.util.concurrent.ExecutorService pool =
         java.util.concurrent.Executors.newFixedThreadPool(2);
     try {
-      lombok.val task =
-          (java.util.concurrent.Callable<Integer>)
-              () ->
-                  postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 0))
-                      .andReturn()
-                      .getResponse()
-                      .getStatus();
-      lombok.val first = pool.submit(task);
-      lombok.val second = pool.submit(task);
+      final Callable<Integer> task =
+          () ->
+              postJson("/disposals/" + id + "/confirm", manager, mapOf("version", 0))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+      final Future<Integer> first = pool.submit(task);
+      final Future<Integer> second = pool.submit(task);
       assertEquals(200, first.get());
       assertEquals(200, second.get());
     } finally {
@@ -796,7 +800,7 @@ class StoreFlowsIT {
 
   @Test
   void successfulFinderAndTokenRefresh() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     long id = device.get("deviceId").asLong();
     String secret = device.get("deviceSecret").asText();
     mvc.perform(
@@ -806,7 +810,7 @@ class StoreFlowsIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fcmToken\":\"rotated-token\"}"))
         .andExpect(status().isOk());
-    lombok.val request =
+    final JsonNode request =
         body(
             postJson("/pda/find", manager, mapOf("deviceId", id))
                 .andExpect(status().isOk())
@@ -928,7 +932,7 @@ class StoreFlowsIT {
 
   @Test
   void transientPushFailureRemainsRetryable() throws Exception {
-    lombok.val device = register();
+    final JsonNode device = register();
     postJson("/pda/find", manager, mapOf("deviceId", device.get("deviceId").asLong()))
         .andExpect(status().isOk());
     doThrow(new IllegalStateException("Unavailable")).when(push).send(any(), any(), any(), any());
@@ -978,14 +982,14 @@ class StoreFlowsIT {
 
   @Test
   void missingVersionCannotOverwriteVersionZero() throws Exception {
-    lombok.val b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 5));
+    final HashMap<String, Object> b = new HashMap<>(adjustment(UUID.randomUUID(), 0, 5));
     b.remove("version");
     postJson("/inventory-adjustments", manager, b).andExpect(status().isBadRequest());
   }
 
   @Test
   void managerRegistersEmployeeWhoCanLogIn() throws Exception {
-    lombok.val response =
+    final JsonNode response =
         body(
             postJson(
                     "/auth/register",
@@ -1024,7 +1028,7 @@ class StoreFlowsIT {
 
   @Test
   void registrationRequiresManagerAndCannotChooseRoleOrStore() throws Exception {
-    lombok.val command =
+    final Map<String, Object> command =
         mapOf(
             "username",
             "scoped.employee",
@@ -1038,7 +1042,7 @@ class StoreFlowsIT {
             "MANAGER");
     postJson("/auth/register", "", command).andExpect(status().isUnauthorized());
     postJson("/auth/register", employee, command).andExpect(status().isForbidden());
-    lombok.val response =
+    final JsonNode response =
         body(
             postJson("/auth/register", other, command).andExpect(status().isCreated()).andReturn());
     assertEquals(2, response.get("storeId").asLong());
@@ -1085,8 +1089,8 @@ class StoreFlowsIT {
 
   @Test
   void developmentSeedIsRepeatableAndPreservesChangedData() throws Exception {
-    lombok.val seeder = new DevelopmentDataSeeder(db, passwords, "test-password");
-    lombok.val tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+    final DevelopmentDataSeeder seeder = new DevelopmentDataSeeder(db, passwords, "test-password");
+    final TransactionTemplate tx = new TransactionTemplate(transactions);
     tx.executeWithoutResult(s -> seeder.run());
     long storeId =
         db.queryForObject("SELECT id FROM stores WHERE store_code='DEMO-001'", Long.class);

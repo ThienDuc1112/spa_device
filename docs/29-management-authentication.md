@@ -1,6 +1,10 @@
 # Authentication trên Management backend
 
+Nếu cần biết bắt đầu triển khai từ đâu và làm theo thứ tự nào, xem [Hướng dẫn làm authentication backend từng bước](30-backend-authentication-implementation-guide.md).
+
 Tài liệu mô tả Spring backend trong `pda-management`, nơi cấp và xác thực token cho PDA. Không mô tả một luồng đăng nhập riêng của frontend quản trị. Luồng Android nằm tại [Authentication trên PDA](28-pda-authentication.md).
+
+Thư viện xác thực chỉ gồm `spring-boot-starter-security` và JJWT **0.11.5**: `jjwt-api` (compile), `jjwt-impl` và `jjwt-jackson` (runtime). Không dùng Spring OAuth2 Resource Server hoặc các API JWT của OAuth2. Các dependency được khai báo trong `pda-management/pom.xml`.
 
 ## 1. Thành phần và trách nhiệm
 
@@ -11,8 +15,8 @@ Các đường dẫn Java bên dưới nằm trong `pda-management/src/main/java
 | `presentation/rest/auth/AuthController.java` | Nhận `/auth/login`, `/auth/refresh`, `/auth/register` |
 | `application/auth/service/AuthenticationService.java` | Kiểm tra tài khoản, cấp token, xoay refresh token và gia hạn |
 | `application/auth/service/SessionPolicy.java` | Dùng chung cấu hình thời gian |
-| `infrastructure/security/JwtTokenProvider.java` | Ký access/refresh JWT và kiểm tra refresh JWT |
-| `infrastructure/security/SecurityConfig.java` | Cấu hình endpoint, decoder và filter chain stateless |
+| `infrastructure/security/JwtTokenProvider.java` | Ký và kiểm tra access/refresh JWT bằng JJWT |
+| `infrastructure/security/SecurityConfig.java` | Cấu hình khóa HS256, endpoint và filter chain stateless |
 | `infrastructure/security/JwtAuthenticationFilter.java` | Xác thực Bearer và chuyển roles thành Spring authorities |
 | `infrastructure/security/SessionValidator.java` | Kiểm tra hạn access token và trạng thái phiên |
 | `infrastructure/security/JsonAuthenticationEntryPoint.java` | Trả lỗi xác thực từ filter dưới dạng JSON |
@@ -79,11 +83,11 @@ Login/refresh luôn trả `accessToken`, `refreshToken`, `expiresIn` (giây). V�
 
 Client gửi `Authorization: Bearer <accessToken>`.
 
-1. `JwtAuthenticationFilter` chuyển xử lý cho Spring `BearerTokenAuthenticationFilter`.
-2. Decoder kiểm tra chữ ký HS256, issuer, thời gian, `type=access` và audience `retail-api`.
+1. `JwtAuthenticationFilter` kế thừa `OncePerRequestFilter`, đọc Bearer token từ header và gọi `JwtTokenProvider.verifyAccess()`; filter được đăng ký trước `UsernamePasswordAuthenticationFilter`.
+2. JJWT kiểm tra chữ ký, issuer và thời gian; provider yêu cầu thuật toán HS256, claim `exp`, `sub`, `type=access` và audience `retail-api`. Audience chấp nhận cả chuỗi và mảng để đọc token cũ.
 3. `SessionValidator` kiểm tra access token chưa hết hạn. Với token có `sessionId`, truy vấn `activeSession(familyId, userId)`.
 4. Phiên active cần có refresh token trong family chưa bị revoke, chưa consume, chưa hết hạn và user vẫn active.
-5. Claim `roles` được chuyển thành authorities có tiền tố `ROLE_` để kiểm tra quyền.
+5. Claim `roles` được chuyển thành authorities có tiền tố `ROLE_`, rồi lưu `UsernamePasswordAuthenticationToken` với principal là JJWT `Claims` vào `SecurityContext` để kiểm tra quyền. `SecurityCurrentActor` đọc user/cửa hàng từ claims và kiểm tra lại dữ liệu tài khoản.
 
 Backend dùng `SessionCreationPolicy.STATELESS`: không tạo HTTP session để lưu trạng thái đăng nhập. Tuy nhiên trạng thái family vẫn được kiểm tra trong database đối với access token mới.
 

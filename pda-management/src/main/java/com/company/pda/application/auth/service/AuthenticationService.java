@@ -45,7 +45,7 @@ public class AuthenticationService implements AuthUseCase {
 
   @Transactional
   public TokenResult login(LoginCommand body) {
-    lombok.val user = repo.user(body.username());
+    final User user = repo.user(body.username());
     boolean valid = passwords.matches(body.password(), user == null ? dummy : user.passwordHash());
     if (!valid || user == null || !user.active()) throw new InvalidCredentialsException();
     ops.audit(user.id(), user.storeId(), "LOGIN", Long.toString(user.id()));
@@ -54,7 +54,7 @@ public class AuthenticationService implements AuthUseCase {
 
   @Transactional(noRollbackFor = DomainException.class)
   public TokenResult refresh(RefreshTokenCommand body) {
-    lombok.val token = repo.refresh(tokens.verifyRefresh(body.refreshToken()));
+    final Refresh token = repo.refresh(tokens.verifyRefresh(body.refreshToken()));
     if (token == null
         || !MessageDigest.isEqual(
             token.tokenHash().getBytes(StandardCharsets.UTF_8),
@@ -69,7 +69,7 @@ public class AuthenticationService implements AuthUseCase {
           token.revoked() || token.consumedAt() != null ? "SESSION_REVOKED" : "SESSION_EXPIRED",
           "Refresh session expired or revoked; sign in again");
     }
-    lombok.val user = repo.userById(token.userId());
+    final User user = repo.userById(token.userId());
     if (user == null || !user.active()) {
       repo.revoke(token.familyId());
       throw new DomainException(401, "SESSION_REVOKED", "Account inactive");

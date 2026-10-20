@@ -22,7 +22,7 @@ public class ErpProductClient {
     if (!productUrl.contains("{barcode}")) {
       throw new IllegalArgumentException("ERP product URL must contain {barcode}");
     }
-    lombok.val requestFactory = new SimpleClientHttpRequestFactory();
+    final SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(5000);
     requestFactory.setReadTimeout(10000);
     this.client = builder.requestFactory(() -> requestFactory).build();

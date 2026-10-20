@@ -27,7 +27,7 @@ public class ProductImageClient {
     if (!productUrl.contains("{productCode}")) {
       throw new IllegalArgumentException("Image URL must contain {productCode}");
     }
-    lombok.val requestFactory = new SimpleClientHttpRequestFactory();
+    final SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(5000);
     requestFactory.setReadTimeout(10000);
     this.client = builder.requestFactory(() -> requestFactory).build();
@@ -42,7 +42,7 @@ public class ProductImageClient {
           client.exchange(
               productUrl, HttpMethod.GET, new HttpEntity<Void>(headers), byte[].class, productCode);
       if (!response.hasBody()) return Optional.empty();
-      lombok.val contentType = response.getHeaders().getContentType();
+      final MediaType contentType = response.getHeaders().getContentType();
       if (contentType == null || !"image".equalsIgnoreCase(contentType.getType())) {
         throw new IllegalStateException("Image server returned a non-image response");
       }

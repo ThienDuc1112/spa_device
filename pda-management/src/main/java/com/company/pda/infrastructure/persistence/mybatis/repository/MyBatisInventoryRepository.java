@@ -6,6 +6,7 @@ import com.company.pda.domain.inventory.repository.InventoryRepository;
 import com.company.pda.infrastructure.persistence.mybatis.converter.InventoryEntityMapper;
 import com.company.pda.infrastructure.persistence.mybatis.mapper.InventoryMapper;
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
@@ -47,7 +48,7 @@ public class MyBatisInventoryRepository implements InventoryRepository {
 
   @Override
   public InventoryAdjustment adjustmentById(UUID id, long storeId) {
-    lombok.val row = mapper.adjustmentById(id, storeId);
+    final Map<String, Object> row = mapper.adjustmentById(id, storeId);
     return row == null
         ? null
         : new InventoryAdjustment(

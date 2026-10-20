@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import javax.servlet.http.*;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
 final class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -15,13 +14,8 @@ final class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
     String code =
         request.getHeader("Authorization") == null ? "AUTH_REQUIRED" : "ACCESS_TOKEN_INVALID";
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-      if (cause instanceof JwtValidationException) {
-        for (org.springframework.security.oauth2.core.OAuth2Error error :
-            ((JwtValidationException) cause).getErrors()) {
-          if ("SESSION_REVOKED".equals(error.getErrorCode())
-              || "ACCESS_TOKEN_EXPIRED".equals(error.getErrorCode())) code = error.getErrorCode();
-        }
-      }
+      if (cause instanceof JwtAuthenticationException)
+        code = ((JwtAuthenticationException) cause).code();
     }
     response.setStatus(401);
     response.setContentType("application/problem+json");

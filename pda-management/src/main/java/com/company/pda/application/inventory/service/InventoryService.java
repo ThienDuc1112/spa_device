@@ -9,7 +9,9 @@ import com.company.pda.application.port.out.CurrentActor;
 import com.company.pda.application.port.out.InventoryAdjustmentPort;
 import com.company.pda.domain.inventory.exception.InsufficientInventoryException;
 import com.company.pda.domain.inventory.model.Inventory;
+import com.company.pda.domain.inventory.model.InventoryAdjustment;
 import com.company.pda.domain.inventory.repository.InventoryRepository;
+import com.company.pda.domain.product.model.Product;
 import com.company.pda.domain.product.repository.ProductRepository;
 import com.company.pda.domain.shared.model.Actor;
 import java.math.BigDecimal;
@@ -47,10 +49,10 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
 
   @Transactional
   public Inventory adjust(AdjustInventoryCommand b) {
-    lombok.val a = actor.get();
+    final Actor a = actor.get();
     repo.lockStore(a.storeId());
-    lombok.val p = found(products.code(b.productCode()));
-    lombok.val previous = repo.adjustmentById(b.requestId(), a.storeId());
+    final Product p = found(products.code(b.productCode()));
+    final InventoryAdjustment previous = repo.adjustmentById(b.requestId(), a.storeId());
     if (previous != null) {
       require(
           previous.productId() == p.id()
@@ -61,7 +63,7 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
           "Request ID already used with different content");
       return found(repo.find(a.storeId(), p.id()));
     }
-    lombok.val stock = found(repo.find(a.storeId(), p.id()));
+    final Inventory stock = found(repo.find(a.storeId(), p.id()));
     require(stock.version() == b.version(), "Inventory changed; reload and retry");
     require(
         repo.update(a.storeId(), p.id(), b.quantity(), b.version()) == 1,
@@ -83,8 +85,8 @@ public class InventoryService implements InventoryUseCase, InventoryAdjustmentPo
   @Override
   public void deduct(Actor a, long productId, BigDecimal quantity, UUID disposalId) {
     require(quantity.signum() > 0, "Quantity must be positive");
-    lombok.val stock = found(repo.find(a.storeId(), productId));
-    lombok.val next = stock.quantity().subtract(quantity);
+    final Inventory stock = found(repo.find(a.storeId(), productId));
+    final BigDecimal next = stock.quantity().subtract(quantity);
     if (next.signum() < 0) throw new InsufficientInventoryException();
     require(
         repo.update(a.storeId(), productId, next, stock.version()) == 1,

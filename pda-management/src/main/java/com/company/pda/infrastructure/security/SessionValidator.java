@@ -1,29 +1,29 @@
 package com.company.pda.infrastructure.security;
 
 import com.company.pda.domain.auth.repository.AuthRepository;
+import io.jsonwebtoken.Claims;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.security.oauth2.core.*;
-import org.springframework.security.oauth2.jwt.Jwt;
 
-final class SessionValidator implements OAuth2TokenValidator<Jwt> {
+final class SessionValidator {
   private final AuthRepository sessions;
 
   SessionValidator(AuthRepository sessions) {
     this.sessions = sessions;
   }
 
-  public OAuth2TokenValidatorResult validate(Jwt jwt) {
-    if (jwt.getExpiresAt() == null || !jwt.getExpiresAt().isAfter(Instant.now()))
-      return OAuth2TokenValidatorResult.failure(new OAuth2Error("ACCESS_TOKEN_EXPIRED"));
-    String family = jwt.getClaimAsString("sessionId");
+  public void validate(Claims claims) {
+    if (claims.getExpiration() == null
+        || !claims.getExpiration().toInstant().isAfter(Instant.now()))
+      throw new JwtAuthenticationException("ACCESS_TOKEN_EXPIRED");
+    Object family = claims.get("sessionId");
     // Tokens issued before this rollout remain usable until their signed expiry.
-    if (family == null) return OAuth2TokenValidatorResult.success();
+    if (family == null) return;
     try {
-      if (sessions.activeSession(UUID.fromString(family), Long.parseLong(jwt.getSubject())))
-        return OAuth2TokenValidatorResult.success();
+      if (sessions.activeSession(
+          UUID.fromString(family.toString()), Long.parseLong(claims.getSubject()))) return;
     } catch (IllegalArgumentException ignored) {
     }
-    return OAuth2TokenValidatorResult.failure(new OAuth2Error("SESSION_REVOKED"));
+    throw new JwtAuthenticationException("SESSION_REVOKED");
   }
 }

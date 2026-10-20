@@ -8,6 +8,7 @@ import com.company.pda.application.port.out.CurrentActor;
 import com.company.pda.application.port.out.PasswordHasher;
 import com.company.pda.domain.auth.repository.AuthRepository;
 import com.company.pda.domain.shared.exception.DomainException;
+import com.company.pda.domain.shared.model.Actor;
 import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,7 @@ public class UserRegistrationService implements RegisterUserUseCase {
   @Override
   @Transactional
   public RegisterUserResult register(RegisterUserCommand command) {
-    lombok.val manager = actor.get();
+    final Actor manager = actor.get();
     if (!users.roles(manager.id()).contains("MANAGER")) {
       throw new DomainException(403, "Only managers may register employees");
     }

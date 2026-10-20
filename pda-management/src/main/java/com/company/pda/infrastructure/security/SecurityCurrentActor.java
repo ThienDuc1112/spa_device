@@ -1,11 +1,12 @@
 package com.company.pda.infrastructure.security;
 
 import com.company.pda.application.port.out.CurrentActor;
+import com.company.pda.domain.auth.model.User;
 import com.company.pda.domain.auth.repository.AuthRepository;
 import com.company.pda.domain.shared.exception.DomainException;
 import com.company.pda.domain.shared.model.Actor;
+import io.jsonwebtoken.Claims;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,11 +18,12 @@ public class SecurityCurrentActor implements CurrentActor {
   }
 
   public Actor get() {
-    lombok.val jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    lombok.val user = users.userById(Long.parseLong(jwt.getSubject()));
+    final Claims jwt =
+        (Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    final User user = users.userById(Long.parseLong(jwt.getSubject()));
     if (user == null
         || !user.active()
-        || user.storeId() != ((Number) jwt.getClaim("storeId")).longValue())
+        || user.storeId() != ((Number) jwt.get("storeId")).longValue())
       throw new DomainException(401, "SESSION_REVOKED", "Session no longer valid");
     return new Actor(user.id(), user.storeId());
   }

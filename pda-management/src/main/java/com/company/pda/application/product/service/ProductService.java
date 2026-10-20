@@ -8,7 +8,9 @@ import com.company.pda.application.product.dto.ImageSyncCommand;
 import com.company.pda.application.product.dto.ProductDtoMapper;
 import com.company.pda.application.product.dto.ProductResult;
 import com.company.pda.application.product.usecase.ProductUseCase;
+import com.company.pda.domain.product.model.Product;
 import com.company.pda.domain.product.repository.ProductRepository;
+import com.company.pda.domain.shared.model.Actor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,8 +36,8 @@ public class ProductService implements ProductUseCase {
 
   @Transactional
   public void sync(ImageSyncCommand body) {
-    lombok.val a = actor.get();
-    lombok.val p = found(repo.code(body.productCode()));
+    final Actor a = actor.get();
+    final Product p = found(repo.code(body.productCode()));
     int changed = repo.image(p.id(), body.imageUrl(), body.sourceVersion());
     repo.imageLog(
         p.id(), body.imageUrl(), body.sourceVersion(), changed == 1 ? "APPLIED" : "STALE", a.id());

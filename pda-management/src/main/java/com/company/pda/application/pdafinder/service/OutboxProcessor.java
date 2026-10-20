@@ -2,9 +2,12 @@ package com.company.pda.application.pdafinder.service;
 
 import com.company.pda.application.port.out.NotificationPort;
 import com.company.pda.application.port.out.OperationsRepository;
+import com.company.pda.domain.device.model.Device;
 import com.company.pda.domain.device.repository.DeviceRepository;
+import com.company.pda.domain.pdafinder.model.PdaFindRequest;
 import com.company.pda.domain.pdafinder.model.PdaFindStatus;
 import com.company.pda.domain.pdafinder.repository.PdaFindRepository;
+import com.company.pda.domain.shared.model.Outbox;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,9 +37,9 @@ public class OutboxProcessor {
 
   @Transactional
   public void processOne() throws Exception {
-    lombok.val event = ops.next();
+    final Outbox event = ops.next();
     if (event == null) return;
-    lombok.val request =
+    final PdaFindRequest request =
         finder.find(
             UUID.fromString(event.aggregateId()),
             json.readTree(event.payload()).get("storeId").asLong());
@@ -51,7 +54,7 @@ public class OutboxProcessor {
       ops.done(event.id());
       return;
     }
-    lombok.val device = devices.find(request.deviceId(), request.storeId());
+    final Device device = devices.find(request.deviceId(), request.storeId());
     if (device == null || device.fcmToken() == null) {
       finder.log(request.id(), request.deviceId(), "NO_TOKEN", null);
       ops.done(event.id());
@@ -77,7 +80,7 @@ public class OutboxProcessor {
 
   @Transactional
   public void expire() {
-    for (lombok.val r : finder.expired()) {
+    for (final PdaFindRequest r : finder.expired()) {
       finder.status(r.id(), PdaFindStatus.EXPIRED.name());
       finder.log(
           r.id(), r.deviceId(), PdaFindStatus.EXPIRED.name(), "No completion before deadline");

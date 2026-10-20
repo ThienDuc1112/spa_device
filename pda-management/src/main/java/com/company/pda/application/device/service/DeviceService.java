@@ -10,6 +10,7 @@ import com.company.pda.application.port.out.CurrentActor;
 import com.company.pda.domain.device.model.Device;
 import com.company.pda.domain.device.repository.DeviceRepository;
 import com.company.pda.domain.shared.exception.DomainException;
+import com.company.pda.domain.shared.model.Actor;
 import com.company.pda.domain.shared.model.SecretHash;
 import java.security.*;
 import java.util.*;
@@ -46,7 +47,7 @@ public class DeviceService implements DeviceUseCase {
 
   @Transactional
   public DeviceRegistrationResult register(RegisterDeviceCommand body) {
-    lombok.val a = actor.get();
+    final Actor a = actor.get();
     byte[] bytes = new byte[32];
     new SecureRandom().nextBytes(bytes);
     String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -63,7 +64,7 @@ public class DeviceService implements DeviceUseCase {
   }
 
   public Device authenticate(long id, String secret) {
-    lombok.val d = repo.identity(id);
+    final Device d = repo.identity(id);
     if (d == null
         || secret == null
         || !MessageDigest.isEqual(
@@ -75,7 +76,7 @@ public class DeviceService implements DeviceUseCase {
 
   @Transactional
   public void token(long id, String secret, UpdateFcmTokenCommand body) {
-    lombok.val d = authenticate(id, secret);
+    final Device d = authenticate(id, secret);
     repo.token(id, body.fcmToken());
     ops.systemAudit(d.storeId(), "DEVICE_TOKEN_REFRESH", Long.toString(id));
   }

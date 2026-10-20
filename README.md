@@ -4,7 +4,9 @@ Spring Boot REST API for authentication, device registration, PDA finder notific
 
 ## Technology
 
-Java 8, Spring Boot 2.7.0, Spring Security OAuth2 resource server, MyBatis, PostgreSQL, Flyway and Firebase Cloud Messaging.
+Java 8, Spring Boot 2.7.0, Spring Security, JJWT 0.11.5, MyBatis, PostgreSQL, Flyway and Firebase Cloud Messaging.
+
+For the backend authentication implementation order, see [Hướng dẫn làm authentication backend từng bước](docs/30-backend-authentication-implementation-guide.md).
 
 ## Build
 

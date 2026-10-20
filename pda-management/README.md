@@ -54,7 +54,7 @@ The `db/legacy` scripts have also been converted to Oracle. They are an alternat
 
 REST controllers use application use cases and DTOs. Application services depend on domain repositories and output ports. MyBatis entities, mapper interfaces/XML, converters and repository implementations are in `infrastructure/persistence/mybatis`.
 
-`JwtAuthenticationFilter` is registered once by `SecurityConfig`. It delegates signature, issuer, expiry, token type and audience validation to the configured Spring Security JWT decoder, and maps the roles claim to `ROLE_` authorities.
+Authentication uses `spring-boot-starter-security` and JJWT 0.11.5 (`jjwt-api`, with `jjwt-impl` and `jjwt-jackson` at runtime). `JwtAuthenticationFilter` is registered once by `SecurityConfig`, before `UsernamePasswordAuthenticationFilter`. `JwtTokenProvider` validates HS256 signature, issuer, expiry, token type and audience with JJWT; the filter validates the session and maps roles to `ROLE_` authorities. The principal is JJWT `Claims`. No Spring OAuth2 Resource Server is used.
 
 `ErpProductClient` and `ProductImageClient` are optional HTTP adapters. They are created only when `app.integration.erp.product-url` or `app.integration.image.product-url` is configured. URLs must contain `{barcode}` or `{productCode}`, respectively. ERP lookup expects the JSON fields in `ProductResult`; image lookup expects image content. Both use connection/read timeouts, represent HTTP 404 as an empty result and propagate other remote failures. They are available for integration wiring; the existing product API continues to read the local product database and Android continues to load image URLs directly. Provider-specific authentication and contracts must be configured for the actual external services.
 

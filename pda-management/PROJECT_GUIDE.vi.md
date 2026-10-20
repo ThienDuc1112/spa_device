@@ -165,7 +165,7 @@ Một số API hiện trả trực tiếp domain model hoặc `Map`/`Object`, v�
 4. `TokenProvider`, được triển khai bởi `JwtTokenProvider`, tạo access token 15 phút và refresh token 14 ngày.
 5. Server lưu hash refresh token cùng thông tin phiên trong `refresh_tokens`, ghi audit rồi trả token cho Android.
 
-Request có access token đi qua `JwtAuthenticationFilter`. Decoder kiểm tra chữ ký, issuer, hạn dùng, `type=access` và audience; roles được ánh xạ thành quyền `ROLE_*`. Các service dùng `CurrentActor` để lấy người dùng/cửa hàng; `SecurityCurrentActor` kiểm tra lại tài khoản đang hoạt động và cửa hàng khớp dữ liệu token.
+Request có access token đi qua `JwtAuthenticationFilter`. `JwtTokenProvider` dùng JJWT 0.11.5 kiểm tra chữ ký HS256, issuer, hạn dùng, `type=access` và audience; filter kiểm tra phiên rồi ánh xạ roles thành quyền `ROLE_*` trong Spring Security. Không dùng Spring OAuth2 Resource Server. Các service dùng `CurrentActor` để lấy người dùng/cửa hàng; `SecurityCurrentActor` đọc JJWT `Claims`, kiểm tra lại tài khoản đang hoạt động và cửa hàng khớp dữ liệu token.
 
 Khi gọi `POST /auth/refresh`, server đánh dấu refresh token cũ đã dùng và cấp cặp token mới. Tái sử dụng token đã dùng làm thu hồi nhóm token cùng phiên. Refresh token không dùng để gọi API nghiệp vụ.
 

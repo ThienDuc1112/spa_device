@@ -38,7 +38,7 @@ class FcmHealthTest {
 
   @Test
   void lastObservedSendFailureEnablesFallbackUntilSendSucceeds() {
-    lombok.val service = service(true, "token");
+    final PdaFinderService service = service(true, "token");
     assertFalse(service.fcmHealth(1, "secret").fallbackRequired());
     for (String event : java.util.Arrays.asList("RETRY", "INVALID_TOKEN", "NO_TOKEN")) {
       when(requests.lastPushEvent(1, 7)).thenReturn(event);
