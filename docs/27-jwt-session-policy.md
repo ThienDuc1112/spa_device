@@ -18,7 +18,7 @@ Không cần thay đổi schema hiện có. Thời hạn phiên lưu trong `refr
 2. Android gửi `PDA_TYPE: ANDROID` trong HTTP header. Response login/refresh cho client này bổ sung `serverTime`, `accessExpiresAt`, `sessionExpiresAt` (epoch milliseconds), `warningSeconds`.
 3. Trước API có xác thực, Android kiểm tra thời hạn access token để refresh nếu cần. Server vẫn kiểm tra chữ ký, issuer, audience, loại token, thời hạn và trạng thái phiên; thời gian phía client chỉ phục vụ lịch refresh/UX.
 4. Refresh tự động xoay token nhưng giữ nguyên giờ hết phiên. Refresh token cũ chỉ dùng được một lần. Dùng lại token đã tiêu thụ sẽ thu hồi cả family; access token mới có `sessionId` cũng bị từ chối khi family không còn hoạt động.
-5. Home và các Fragment bên trong hiển thị thời gian còn lại. Trước khi hết phiên 5 phút, `BaseActivity` hiện popup cho phép gia hạn. Có nút **Extend session** để chủ động thử lại.
+5. `BaseActivity` hiển thị thời gian còn lại bằng bong bóng nổi dùng chung cho các màn hình có phiên, gồm Home/các Fragment và thiết lập âm thanh khi đang đăng nhập. Có thể kéo đổi vị trí, chạm xem thông tin và chọn **Extend session**. Trước khi hết phiên 5 phút, bong bóng đổi màu và `BaseActivity` hiện popup cho phép gia hạn.
 6. Gia hạn gọi cùng `/auth/refresh` với `extendSession: true`. Chỉ refresh token còn hợp lệ mới được gia hạn; hạn mới là thời điểm xử lý + 2 giờ. Tất cả refresh trong ứng dụng dùng chung khóa để tránh dùng cùng token hai lần.
 7. Hết phiên hoặc token/phiên bị vô hiệu hóa: xóa phiên local, về Login và hiện thông báo. Lỗi mạng/server khi refresh giữ phiên local để thử lại trong thời hạn còn hiệu lực.
 

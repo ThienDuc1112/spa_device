@@ -11,6 +11,9 @@ import java.util.Locale;
 public abstract class BaseActivity extends AppCompatActivity {
   private final Handler sessionHandler = new Handler(Looper.getMainLooper());
   private AlertDialog sessionDialog;
+  private SessionBubble sessionBubble;
+  private boolean sessionError;
+  private String remainingTime = "Active";
   private long warnedExpiry;
   private boolean renewing;
   private boolean endingSession;
@@ -27,20 +30,24 @@ public abstract class BaseActivity extends AppCompatActivity {
     return false;
   }
 
-  protected void onSessionTimeChanged(String text) {}
-
   @Override
-  protected void onResume() {
-    super.onResume();
+  protected void onPostResume() {
+    super.onPostResume();
     if (requiresSession()) {
       if (sessionTasks == null) sessionTasks = new ScreenTasks(this, this);
-      sessionHandler.post(sessionTick);
+      sessionHandler.removeCallbacks(sessionTick);
+      updateSession();
+      if (!endingSession) sessionHandler.postDelayed(sessionTick, 1000);
     }
   }
 
   @Override
   protected void onPause() {
     sessionHandler.removeCallbacks(sessionTick);
+    if (sessionBubble != null) {
+      sessionBubble.detach();
+      sessionBubble = null;
+    }
     if (sessionDialog != null) {
       sessionDialog.dismiss();
       sessionDialog = null;
@@ -57,7 +64,8 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
     long expiry = SessionTime.sessionExpiry(tokens);
     if (expiry == 0) {
-      onSessionTimeChanged("Session active");
+      remainingTime = "Active";
+      renderSession(false);
       return;
     }
     long remaining = expiry - SessionTime.now(tokens, System.currentTimeMillis());
@@ -66,35 +74,57 @@ public abstract class BaseActivity extends AppCompatActivity {
       return;
     }
     long seconds = (remaining + 999) / 1000;
-    onSessionTimeChanged(
+    remainingTime =
         String.format(
-            Locale.US,
-            "Session: %02d:%02d:%02d",
-            seconds / 3600,
-            (seconds / 60) % 60,
-            seconds % 60));
+            Locale.US, "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60);
     long warning = tokens.warningSeconds > 0 ? tokens.warningSeconds : 300;
-    if (remaining <= warning * 1000 && warnedExpiry != expiry && !renewing) {
+    boolean expiring = remaining <= warning * 1000;
+    renderSession(expiring);
+    if (expiring && warnedExpiry != expiry && !renewing && sessionDialog == null) {
       warnedExpiry = expiry;
-      sessionDialog =
-          new AlertDialog.Builder(this)
-              .setTitle("Session expiring")
-              .setMessage("Your session is about to expire. Extend it to continue working.")
-              .setNegativeButton("Later", (dialog, which) -> sessionDialog = null)
-              .setPositiveButton(
-                  "Extend session",
-                  (dialog, which) -> {
-                    sessionDialog = null;
-                    renewSession();
-                  })
-              .setCancelable(false)
-              .show();
+      showSessionDialog(true);
     }
+  }
+
+  private void renderSession(boolean warning) {
+    if (sessionBubble == null)
+      sessionBubble = new SessionBubble(this, () -> showSessionDialog(false));
+    sessionBubble.update(remainingTime, warning, renewing);
+    if (sessionDialog != null && sessionDialog.isShowing() && !sessionError) {
+      sessionDialog.setMessage(sessionMessage());
+      sessionDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(!renewing);
+    }
+  }
+
+  private String sessionMessage() {
+    return "Time remaining: "
+        + remainingTime
+        + "\nExtend your session to continue working beyond its current expiry.";
+  }
+
+  private void showSessionDialog(boolean warning) {
+    if (endingSession || isFinishing() || (sessionDialog != null && sessionDialog.isShowing()))
+      return;
+    sessionError = false;
+    sessionDialog =
+        new AlertDialog.Builder(this)
+            .setTitle(warning ? "Session expiring" : "Your session")
+            .setMessage(sessionMessage())
+            .setNegativeButton(warning ? "Later" : "Close", null)
+            .setPositiveButton("Extend session", (dialog, which) -> renewSession())
+            .setOnDismissListener(dialog -> sessionDialog = null)
+            .show();
+    sessionDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(!renewing);
   }
 
   protected final void renewSession() {
     if (renewing || endingSession) return;
     renewing = true;
+    updateSession();
+    if (endingSession) {
+      renewing = false;
+      return;
+    }
     var modules = ((PdaApplication) getApplication()).modules();
     sessionTasks.runAsync(
         "Extending session...",
@@ -109,10 +139,13 @@ public abstract class BaseActivity extends AppCompatActivity {
 
           public boolean onError(Exception error) {
             renewing = false;
+            if (sessionDialog != null) sessionDialog.dismiss();
+            sessionError = true;
             sessionDialog =
                 new AlertDialog.Builder(BaseActivity.this)
                     .setTitle("Unable to extend session")
                     .setMessage("Check your connection and try again before the session expires.")
+                    .setOnDismissListener(dialog -> sessionDialog = null)
                     .setNegativeButton("Close", null)
                     .setPositiveButton("Retry", (dialog, which) -> renewSession())
                     .show();
@@ -124,6 +157,11 @@ public abstract class BaseActivity extends AppCompatActivity {
   private void endSession() {
     if (endingSession) return;
     endingSession = true;
+    sessionHandler.removeCallbacks(sessionTick);
+    if (sessionBubble != null) {
+      sessionBubble.detach();
+      sessionBubble = null;
+    }
     ((PdaApplication) getApplication()).modules().tokens.logout();
     ScreenSupport.login(this, "Your session has expired or was revoked. Please sign in again.");
   }

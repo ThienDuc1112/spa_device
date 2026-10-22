@@ -26,11 +26,6 @@ public class HomeActivity extends AlarmAwareActivity {
     return true;
   }
 
-  @Override
-  protected void onSessionTimeChanged(String text) {
-    if (binding != null) binding.sessionTime.setText(text);
-  }
-
   private AppModule modules;
   public ScreenTasks tasks;
   public final ArrayList<Product> scanned = new ArrayList<>();
@@ -68,7 +63,6 @@ public class HomeActivity extends AlarmAwareActivity {
     ScreenSupport.insets(binding.getRoot());
     ScreenSupport.observe(this, this, tasks);
     var ui = new ScreenViews(binding.content);
-    ui.button("Extend session", this::renewSession);
     ui.button("Scan Order", () -> navigate("product"));
     ui.button("Disposal inquiry", () -> navigate("disposal"));
     ui.button("Register this PDA", this::register);

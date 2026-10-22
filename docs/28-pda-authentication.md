@@ -94,11 +94,17 @@ Refresh bị 401 sẽ xóa session phù hợp. Lỗi mạng, 5xx hoặc response
 
 Ở Activity yêu cầu phiên (`requiresSession()` trả `true`), `BaseActivity` kiểm tra mỗi giây khi Activity đang resumed:
 
-- Cập nhật countdown qua `onSessionTimeChanged()`.
+- Cập nhật countdown `HH:mm:ss` trong `SessionBubble`, một bong bóng nổi trên nội dung màn hình; không cuộn theo danh sách.
 - Khi còn dưới `warningSeconds` (fallback 300 giây), hiện popup gia hạn.
 - Người dùng chọn **Extend session**: gọi `renewSession()` → `ApiCalls.extendSession(executor)` → `refresh(current, true)`.
 - Server chấp nhận gia hạn: lưu cặp token mới và cập nhật countdown. Hạn phiên mới là thời điểm xử lý trên server cộng 2 giờ theo cấu hình.
 - Gia hạn lỗi mạng: hiện thông báo và nút Retry; người dùng cần thử lại trước khi phiên hết hạn.
+
+Bong bóng dùng chung trong `BaseActivity`: kéo để đổi vị trí, thả để bám cạnh trái/phải; vị trí được giữ khi đổi màn hình hoặc xoay máy. Chạm bong bóng để xem thời gian còn lại và chọn **Extend session**. Khi gần hết phiên, bong bóng đổi màu và nhãn thành **Expiring**, đồng thời giữ popup cảnh báo. Đây là thời gian còn lại của phiên, không phải thời gian access token.
+
+Các Fragment sản phẩm, ảnh, tồn kho và disposal dùng bong bóng của `HomeActivity`, không tạo timer riêng. `FinderSoundActivity` cũng dùng `BaseActivity` và theo dõi phiên nếu mở khi đang đăng nhập; màn hình thiết lập âm thanh vẫn có thể mở độc lập khi chưa có phiên. Màn hình Login không hiển thị bong bóng.
+
+Để thêm màn hình nghiệp vụ mới, kế thừa `BaseActivity` (hoặc `AlarmAwareActivity`) và trả `true` từ `requiresSession()`. Base gắn bong bóng sau khi Activity đã dựng nội dung (`onPostResume`), dừng timer và tháo bong bóng khi pause; quay lại màn hình sẽ tính lại từ hạn phiên thực tế. Không cần thêm countdown vào layout từng màn hình. Bong bóng nằm trong cửa sổ ứng dụng, không cần quyền hiển thị đè lên app khác; các dialog và màn hình hệ thống vẫn có lớp hiển thị riêng.
 
 Tự refresh access token không kéo dài phiên. Chỉ yêu cầu gia hạn rõ ràng mới gửi `extendSession: true`. Nếu một refresh khác vừa hoàn tất, `refresh()` có thể dùng lại token mới và chưa gửi yêu cầu gia hạn; UI tiếp tục dùng hạn thực tế trong token nhận được.
 
@@ -125,6 +131,7 @@ Polling, cập nhật FCM token và gửi ACK dùng `X-Device-Id` / `X-Device-Se
 
 - `ApiCallsTest`: refresh trước request, refresh sau 401, retry một lần, request đồng thời, lỗi refresh, logout trong lúc refresh, payload gia hạn.
 - `SessionTimeTest`: tính thời gian và fallback `exp`.
+- `SessionBubbleTest` (instrumentation): hiển thị qua điều hướng, tái tạo Activity và màn hình âm thanh; ẩn trên Login; kéo, giữ vị trí và chạm mở thông tin phiên.
 - Trên thiết bị: đăng nhập, countdown, popup gia hạn, quay lại app sau khi hết phiên và mất mạng lúc gia hạn.
 
 Chạy kiểm thử tự động từ thư mục `pda-android`: `gradlew.bat :app:testDebugUnitTest :app:lintDebug`.

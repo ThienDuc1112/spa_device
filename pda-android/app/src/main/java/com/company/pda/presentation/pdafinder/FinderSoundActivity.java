@@ -7,21 +7,29 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.widget.TextView;
-import androidx.appcompat.app.AppCompatActivity;
 import com.company.device.api.AlarmPolicy;
 import com.company.device.api.DeviceAlarmAdapter;
 import com.company.device.factory.DeviceAudioSetup;
+import com.company.pda.PdaApplication;
+import com.company.pda.common.util.BaseActivity;
 import com.company.pda.common.util.ScreenViews;
 import com.company.pda.di.DeviceModule;
 
 /** Setup is performed locally on each PDA that must be findable. */
-public class FinderSoundActivity extends AppCompatActivity {
+public class FinderSoundActivity extends BaseActivity {
   private final Handler handler = new Handler(Looper.getMainLooper());
   private DeviceAlarmAdapter adapter;
   private TextView status;
+  private boolean sessionRequired;
+
+  @Override
+  protected boolean requiresSession() {
+    return sessionRequired;
+  }
 
   @Override
   public void onCreate(Bundle saved) {
+    sessionRequired = ((PdaApplication) getApplication()).modules().tokens.tokens() != null;
     super.onCreate(saved);
   }
 
